@@ -44,7 +44,7 @@ impl AppState {
             "SQLite version {}",
             util::version_to_string(sqlite::version())
         );
-        let conn = sqlite::open(&config.core.db_path).expect("Failed to open DB");
+        let conn = util::connect_to_db(&config.core.db_path);
         Self {
             db: Arc::new(Mutex::new(conn)),
         }

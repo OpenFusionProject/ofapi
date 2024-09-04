@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
-use log::{error, info, warn};
+use axum::{extract::State, routing::get, Router};
+use axum_server::tls_rustls::RustlsConfig;
+use log::{info, warn};
 use serde::Deserialize;
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
-use tide::{Request, Server};
-use tide_rustls::TlsListener;
 use tokio::sync::Mutex;
 
 mod util;
@@ -39,6 +39,7 @@ impl Config {
 #[derive(Clone)]
 struct AppState {
     db: Arc<Mutex<Connection>>,
+    is_tls: bool,
 }
 impl AppState {
     fn new(config: &Config) -> Self {
@@ -49,6 +50,7 @@ impl AppState {
         let conn = util::connect_to_db(&config.core.db_path);
         Self {
             db: Arc::new(Mutex::new(conn)),
+            is_tls: false,
         }
     }
 }
@@ -72,28 +74,37 @@ async fn main() {
     // init app state
     let state = AppState::new(&config);
 
-    // register endpoints
-    let mut app = tide::with_state(state);
-    app.at("/").get(get_info);
+    // register endpoints for both HTTP and HTTPS
+    let routes = Router::new().route("/", get(get_info));
 
-    // init both protocols and wait for them to finish
-    let http = init_http(app.clone(), &config);
-    let https = init_https(app, &config);
+    // register HTTPS-only endpoints
+    let routes_tls = Router::new().merge(routes.clone());
+
+    // init both protocols
+    // N.B. these listen concurrently, but NOT in parallel (see tokio::join!)
+    let http = init_http(routes, &config, state.clone());
+    let https = init_https(routes_tls, &config, state);
     let _ = tokio::join!(http, https);
 }
 
-async fn init_http(app: Server<AppState>, config: &Config) {
+const BIND_IP: [u8; 4] = [127, 0, 0, 1];
+
+async fn init_http(routes: Router<Arc<AppState>>, config: &Config, state: AppState) {
     const DEFAULT_HTTP_PORT: u16 = 80;
 
-    let addr = format!("0.0.0.0:{}", config.core.port.unwrap_or(DEFAULT_HTTP_PORT));
+    let app = routes.with_state(Arc::new(state));
+
+    let addr = SocketAddr::from((BIND_IP, config.core.port.unwrap_or(DEFAULT_HTTP_PORT)));
     info!("HTTP listening on {}", addr);
-    if let Err(e) = app.listen(addr).await {
-        error!("HTTP listener crashed: {}", e);
-    }
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
-async fn init_https(app: Server<AppState>, config: &Config) {
+async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: AppState) {
     const DEFAULT_HTTPS_PORT: u16 = 443;
+
+    state.is_tls = true;
+    let app = routes.with_state(Arc::new(state));
 
     let Some(ref tls_config) = config.tls else {
         warn!("Missing or malformed TLS config. HTTPS disabled");
@@ -102,33 +113,23 @@ async fn init_https(app: Server<AppState>, config: &Config) {
 
     let cert_path = &tls_config.cert_path;
     let key_path = &tls_config.key_path;
-
-    // make sure these files can be opened
-    if !std::path::Path::new(cert_path).exists() {
-        warn!("{} not found. HTTPS disabled", cert_path);
+    let Ok(rustls_cfg) = RustlsConfig::from_pem_file(cert_path, key_path).await else {
+        warn!("Failed to load TLS cert or key. HTTPS disabled");
         return;
-    }
+    };
 
-    if !std::path::Path::new(key_path).exists() {
-        warn!("{} not found. HTTPS disabled", key_path);
-        return;
-    }
-
-    let addr = format!("0.0.0.0:{}", tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT));
+    let addr = SocketAddr::from((BIND_IP, tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT)));
     info!("HTTPS listening on {}", addr);
-    if let Err(e) = app
-        .listen(
-            TlsListener::build()
-                .addrs(addr)
-                .cert(cert_path)
-                .key(key_path),
-        )
+    axum_server::bind_rustls(addr, rustls_cfg)
+        .serve(app.into_make_service())
         .await
-    {
-        error!("HTTPS listener crashed: {}", e);
-    }
+        .unwrap();
 }
 
-async fn get_info(_req: Request<AppState>) -> tide::Result {
-    Ok(format!("OFAPI v{}", env!("CARGO_PKG_VERSION")).into())
+async fn get_info(State(state): State<Arc<AppState>>) -> String {
+    format!(
+        "OFAPI v{}\ntls: {:?}",
+        env!("CARGO_PKG_VERSION"),
+        state.is_tls
+    )
 }

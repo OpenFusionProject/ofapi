@@ -4,12 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+axum = { version = "0.7.5", features = ["multipart"] }
+axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"] }
 log = "0.4.22"
 serde = { version = "1.0.209", features = ["derive"] }
 simplelog = "0.12.2"
 sqlite = "0.36.1"
-tide = "0.16.0"
-tide-governor = "1.0.3"
-tide-rustls = "0.3.0"
 tokio = { version = "1.40.0", features = ["full"] }
 toml = "0.8.19"

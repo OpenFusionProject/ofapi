@@ -1,0 +1,8 @@
+[core]
+db_path = "database.db"
+port = 80
+
+[tls]
+cert_path = "cert.pem"
+key_path = "key.pem"
+port = 443

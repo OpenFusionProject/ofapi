@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+use log::{error, info, warn};
 use serde::Deserialize;
+use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tide::{Request, Server};
 use tide_rustls::TlsListener;
@@ -40,7 +42,7 @@ struct AppState {
 }
 impl AppState {
     fn new(config: &Config) -> Self {
-        println!(
+        info!(
             "SQLite version {}",
             util::version_to_string(sqlite::version())
         );
@@ -53,10 +55,19 @@ impl AppState {
 
 #[tokio::main]
 async fn main() {
-    println!("OFAPI v{}", env!("CARGO_PKG_VERSION"));
-
     // load config
     let config = Config::load();
+
+    // init logging
+    TermLogger::init(
+        LevelFilter::Info,
+        simplelog::Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .expect("Failed to init logger");
+
+    info!("OFAPI v{}", env!("CARGO_PKG_VERSION"));
 
     // init app state
     let state = AppState::new(&config);
@@ -75,9 +86,9 @@ async fn init_http(app: Server<AppState>, config: &Config) {
     const DEFAULT_HTTP_PORT: u16 = 80;
 
     let addr = format!("0.0.0.0:{}", config.core.port.unwrap_or(DEFAULT_HTTP_PORT));
-    println!("HTTP listening on {}", addr);
+    info!("HTTP listening on {}", addr);
     if let Err(e) = app.listen(addr).await {
-        eprintln!("HTTP listener crashed: {}", e);
+        error!("HTTP listener crashed: {}", e);
     }
 }
 
@@ -85,7 +96,7 @@ async fn init_https(app: Server<AppState>, config: &Config) {
     const DEFAULT_HTTPS_PORT: u16 = 443;
 
     let Some(ref tls_config) = config.tls else {
-        eprintln!("Missing or malformed TLS config. HTTPS disabled");
+        warn!("Missing or malformed TLS config. HTTPS disabled");
         return;
     };
 
@@ -94,17 +105,17 @@ async fn init_https(app: Server<AppState>, config: &Config) {
 
     // make sure these files can be opened
     if !std::path::Path::new(cert_path).exists() {
-        eprintln!("{} not found. HTTPS disabled", cert_path);
+        warn!("{} not found. HTTPS disabled", cert_path);
         return;
     }
 
     if !std::path::Path::new(key_path).exists() {
-        eprintln!("{} not found. HTTPS disabled", key_path);
+        warn!("{} not found. HTTPS disabled", key_path);
         return;
     }
 
     let addr = format!("0.0.0.0:{}", tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT));
-    println!("HTTPS listening on {}", addr);
+    info!("HTTPS listening on {}", addr);
     if let Err(e) = app
         .listen(
             TlsListener::build()
@@ -114,7 +125,7 @@ async fn init_https(app: Server<AppState>, config: &Config) {
         )
         .await
     {
-        eprintln!("HTTPS listener crashed: {}", e);
+        error!("HTTPS listener crashed: {}", e);
     }
 }
 

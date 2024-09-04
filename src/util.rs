@@ -1,3 +1,4 @@
+use log::info;
 use sqlite::{Connection, State};
 
 pub fn version_to_string(version: usize) -> String {
@@ -28,6 +29,6 @@ pub fn connect_to_db(path: &str) -> Connection {
     }
     drop(stmt);
 
-    println!("Connected to database");
+    info!("Connected to database");
     conn
 }

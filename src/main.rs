@@ -8,6 +8,7 @@ use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tokio::sync::Mutex;
 
+mod rankinfo;
 mod util;
 
 #[derive(Deserialize, Clone)]
@@ -27,6 +28,7 @@ struct TlsConfig {
 struct Config {
     core: CoreConfig,
     tls: Option<TlsConfig>,
+    rankinfo: Option<rankinfo::RankInfoConfig>,
 }
 impl Config {
     fn load() -> Self {
@@ -40,6 +42,7 @@ impl Config {
 struct AppState {
     db: Arc<Mutex<Connection>>,
     is_tls: bool,
+    config: Config,
 }
 impl AppState {
     fn new(config: &Config) -> Self {
@@ -51,6 +54,7 @@ impl AppState {
         Self {
             db: Arc::new(Mutex::new(conn)),
             is_tls: false,
+            config: config.clone(),
         }
     }
 }
@@ -75,7 +79,10 @@ async fn main() {
     let state = AppState::new(&config);
 
     // register endpoints for both HTTP and HTTPS
-    let routes = Router::new().route("/", get(get_info));
+    let mut routes = Router::new().route("/", get(get_info));
+    if let Some(ref rankinfo_config) = config.rankinfo {
+        routes = rankinfo::register(routes, rankinfo_config);
+    }
 
     // register HTTPS-only endpoints
     let routes_tls = Router::new().merge(routes.clone());

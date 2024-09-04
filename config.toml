@@ -6,3 +6,7 @@ port = 80
 cert_path = "cert.pem"
 key_path = "key.pem"
 port = 443
+
+[rankinfo]
+route = "/getranks"
+placeholders = false

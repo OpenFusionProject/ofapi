@@ -32,3 +32,11 @@ pub fn connect_to_db(path: &str) -> Connection {
     info!("Connected to database");
     conn
 }
+
+pub fn wrap_xml(name: &str, content: &str, newlines: bool) -> String {
+    if newlines {
+        format!("<{}>\n{}</{}>\n", name, content, name)
+    } else {
+        format!("<{}>{}</{}>", name, content, name)
+    }
+}

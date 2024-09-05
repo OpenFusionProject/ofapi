@@ -120,12 +120,17 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
         return;
     };
 
-    let cert_path = &tls_config.cert_path;
-    let key_path = &tls_config.key_path;
-    let Ok(rustls_cfg) = RustlsConfig::from_pem_file(cert_path, key_path).await else {
-        warn!("Failed to load TLS cert or key. HTTPS disabled");
-        return;
-    };
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .unwrap();
+    let rustls_cfg =
+        match RustlsConfig::from_pem_file(&tls_config.cert_path, &tls_config.key_path).await {
+            Err(e) => {
+                warn!("Failed to activate TLS ({}); HTTPS disabled", e);
+                return;
+            }
+            Ok(cfg) => cfg,
+        };
 
     let addr = SocketAddr::from((BIND_IP, tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT)));
     info!("HTTPS listening on {}", addr);

@@ -7,6 +7,7 @@ edition = "2021"
 axum = { version = "0.7.5", features = ["multipart"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"] }
 log = "0.4.22"
+rustls = { version = "0.23.12", features = ["ring"], default-features = false }
 serde = { version = "1.0.209", features = ["derive"] }
 simplelog = "0.12.2"
 sqlite = "0.36.1"

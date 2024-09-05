@@ -9,6 +9,7 @@ use sqlite::Connection;
 use tokio::sync::Mutex;
 
 mod rankinfo;
+mod statics;
 mod util;
 
 #[derive(Deserialize, Clone)]
@@ -80,6 +81,7 @@ async fn main() {
 
     // register endpoints for both HTTP and HTTPS
     let mut routes = Router::new().route("/", get(get_info));
+    routes = statics::register(routes);
     if let Some(ref rankinfo_config) = config.rankinfo {
         routes = rankinfo::register(routes, rankinfo_config);
     }

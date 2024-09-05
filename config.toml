@@ -9,4 +9,4 @@ port = 443
 
 [rankinfo]
 route = "/getranks"
-placeholders = false
+placeholders = true

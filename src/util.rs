@@ -40,3 +40,16 @@ pub fn wrap_xml(name: &str, content: &str, newlines: bool) -> String {
         format!("<{}>{}</{}>", name, content, name)
     }
 }
+
+pub fn parse_csv(data: &str) -> Vec<Vec<String>> {
+    // do not include empty lines or empty fields
+    data.lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            line.split(',')
+                .map(|field| field.trim().to_string())
+                .filter(|field| !field.is_empty())
+                .collect()
+        })
+        .collect()
+}

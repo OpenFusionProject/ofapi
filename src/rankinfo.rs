@@ -81,8 +81,8 @@ fn db_parse_ranks(mut stmt: sqlite::Statement, num: usize, fill: bool) -> Vec<Ra
 
 fn ranks_to_xml_scores(mut ranks: Vec<Rank>) -> Vec<String> {
     ranks.sort_by(|a, b| {
-        a.score
-            .partial_cmp(&b.score)
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     let mut rank = 1;

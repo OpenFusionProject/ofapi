@@ -1,5 +1,5 @@
 [core]
-db_path = "database.db"
+db_path = "../OpenFusion/database.db"
 port = 80
 
 [tls]
@@ -10,3 +10,6 @@ port = 443
 [rankinfo]
 route = "/getranks"
 placeholders = true
+
+[auth]
+route = "/auth"

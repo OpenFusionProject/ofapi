@@ -1,13 +1,16 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use ::ring::rand::SystemRandom;
 use axum::{extract::State, routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use log::{info, warn};
+use rustls::crypto::ring;
 use serde::Deserialize;
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tokio::sync::Mutex;
 
+mod auth;
 mod rankinfo;
 mod statics;
 mod util;
@@ -30,6 +33,7 @@ struct Config {
     core: CoreConfig,
     tls: Option<TlsConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,
+    auth: Option<auth::AuthConfig>,
 }
 impl Config {
     fn load() -> Self {
@@ -42,6 +46,7 @@ impl Config {
 #[derive(Clone)]
 struct AppState {
     db: Arc<Mutex<Connection>>,
+    rng: Arc<SystemRandom>,
     is_tls: bool,
     config: Config,
 }
@@ -54,6 +59,7 @@ impl AppState {
         let conn = util::connect_to_db(&config.core.db_path);
         Self {
             db: Arc::new(Mutex::new(conn)),
+            rng: Arc::new(SystemRandom::new()),
             is_tls: false,
             config: config.clone(),
         }
@@ -87,7 +93,10 @@ async fn main() {
     }
 
     // register HTTPS-only endpoints
-    let routes_tls = Router::new().merge(routes.clone());
+    let mut routes_tls = Router::new().merge(routes.clone());
+    if let Some(ref auth_config) = config.auth {
+        routes_tls = auth::register(routes_tls, auth_config);
+    }
 
     // init both protocols
     // N.B. these listen concurrently, but NOT in parallel (see tokio::join!)
@@ -120,9 +129,7 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
         return;
     };
 
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .unwrap();
+    ring::default_provider().install_default().unwrap();
     let rustls_cfg =
         match RustlsConfig::from_pem_file(&tls_config.cert_path, &tls_config.key_path).await {
             Err(e) => {

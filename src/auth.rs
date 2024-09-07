@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -23,6 +26,7 @@ pub struct AuthRequest {
 #[derive(Serialize)]
 pub struct AuthResponse {
     cookie: String,
+    expires: u64,
 }
 
 pub fn register(routes: Router<Arc<AppState>>, config: &AuthConfig) -> Router<Arc<AppState>> {
@@ -68,9 +72,9 @@ fn check_credentials(
     }
 }
 
-const COOKIE_LENGTH: usize = 64;
-const COOKIE_BYTES: usize = COOKIE_LENGTH * 3 / 4;
 fn gen_cookie(rng: &SystemRandom) -> String {
+    const COOKIE_LENGTH: usize = 64;
+    const COOKIE_BYTES: usize = COOKIE_LENGTH * 3 / 4;
     let mut cookie_bytes = [0; COOKIE_BYTES];
     rng.fill(&mut cookie_bytes).unwrap();
     let cookie = BASE64_STANDARD.encode(cookie_bytes);
@@ -78,13 +82,23 @@ fn gen_cookie(rng: &SystemRandom) -> String {
     cookie
 }
 
-fn set_cookie(db: &Connection, account_id: i64, cookie: &str) -> Result<(), sqlite::Error> {
-    const QUERY: &str = "INSERT OR REPLACE INTO Auth (AccountID, Cookie, Valid) VALUES (?, ?, 1);";
+fn set_cookie(db: &Connection, account_id: i64, cookie: &str) -> Result<u64, sqlite::Error> {
+    const QUERY: &str =
+        "INSERT OR REPLACE INTO Auth (AccountID, Cookie, Expires) VALUES (?, ?, ?);";
+    const VALID_FOR: Duration = Duration::from_secs(60);
+
+    let expires = SystemTime::now() + VALID_FOR;
+    let expires_timestamp = expires
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
     let mut stmt = db.prepare(QUERY)?;
     stmt.bind((1, account_id)).unwrap();
     stmt.bind((2, cookie)).unwrap();
+    stmt.bind((3, expires_timestamp as i64)).unwrap();
     stmt.next()?;
-    Ok(())
+    Ok(expires_timestamp)
 }
 
 async fn do_auth(
@@ -97,11 +111,11 @@ async fn do_auth(
     let account_id = check_credentials(&db, &req.username, &req.password)?;
 
     let cookie = gen_cookie(&app.rng);
-    set_cookie(&db, account_id, &cookie).map_err(|e| {
+    let expires = set_cookie(&db, account_id, &cookie).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("DB error: {}", e),
         )
     })?;
-    Ok(Json(AuthResponse { cookie }))
+    Ok(Json(AuthResponse { cookie, expires }))
 }

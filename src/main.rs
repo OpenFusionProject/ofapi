@@ -2,13 +2,14 @@ use std::{net::SocketAddr, sync::Arc};
 
 use ::ring::rand::SystemRandom;
 use axum::{extract::State, routing::get, Router};
-use axum_server::tls_rustls::RustlsConfig;
 use log::{info, warn};
-use rustls::crypto::ring;
 use serde::Deserialize;
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tokio::sync::Mutex;
+
+#[cfg(feature = "tls")]
+use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
 
 mod auth;
 mod rankinfo;
@@ -21,6 +22,7 @@ struct CoreConfig {
     port: Option<u16>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Clone)]
 struct TlsConfig {
     cert_path: String,
@@ -109,10 +111,10 @@ const BIND_IP: [u8; 4] = [127, 0, 0, 1];
 
 async fn init_http(routes: Router<Arc<AppState>>, config: &Config, state: AppState) {
     const DEFAULT_HTTP_PORT: u16 = 80;
+    let addr = SocketAddr::from((BIND_IP, config.core.port.unwrap_or(DEFAULT_HTTP_PORT)));
 
     let app = routes.with_state(Arc::new(state));
 
-    let addr = SocketAddr::from((BIND_IP, config.core.port.unwrap_or(DEFAULT_HTTP_PORT)));
     info!("HTTP listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -129,22 +131,38 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
         return;
     };
 
-    ring::default_provider().install_default().unwrap();
-    let rustls_cfg =
-        match RustlsConfig::from_pem_file(&tls_config.cert_path, &tls_config.key_path).await {
-            Err(e) => {
-                warn!("Failed to activate TLS ({}); HTTPS disabled", e);
-                return;
-            }
-            Ok(cfg) => cfg,
-        };
-
     let addr = SocketAddr::from((BIND_IP, tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT)));
+
+    #[cfg(not(feature = "tls"))]
+    {
+        warn!("TLS APIs enabled but OFAPI was not compiled with the `tls` feature. Encryption should be done at the proxy level!");
+    }
+
     info!("HTTPS listening on {}", addr);
-    axum_server::bind_rustls(addr, rustls_cfg)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+
+    #[cfg(feature = "tls")]
+    {
+        ring::default_provider().install_default().unwrap();
+        let rustls_cfg =
+            match RustlsConfig::from_pem_file(&tls_config.cert_path, &tls_config.key_path).await {
+                Err(e) => {
+                    warn!("Failed to activate TLS ({}); HTTPS disabled", e);
+                    return;
+                }
+                Ok(cfg) => cfg,
+            };
+
+        axum_server::bind_rustls(addr, rustls_cfg)
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    }
+
+    #[cfg(not(feature = "tls"))]
+    {
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    }
 }
 
 async fn get_info(State(state): State<Arc<AppState>>) -> String {

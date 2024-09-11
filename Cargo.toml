@@ -8,6 +8,7 @@ axum = { version = "0.7.5", features = ["multipart"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"], optional = true }
 base64 = "0.22.1"
 bcrypt = "0.15.1"
+jsonwebtoken = "9.3.0"
 log = "0.4.22"
 ring = "0.17.8"
 rustls = { version = "0.23.12", features = ["ring"], default-features = false, optional = true }

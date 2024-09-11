@@ -11,6 +11,7 @@ use tokio::sync::Mutex;
 #[cfg(feature = "tls")]
 use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
 
+mod auth;
 mod cookie;
 mod rankinfo;
 mod statics;
@@ -35,6 +36,7 @@ struct Config {
     core: CoreConfig,
     tls: Option<TlsConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,
+    auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
 }
 impl Config {
@@ -96,6 +98,9 @@ async fn main() {
 
     // register HTTPS-only endpoints
     let mut routes_tls = Router::new().merge(routes.clone());
+    if let Some(ref auth_config) = config.auth {
+        routes_tls = auth::register(routes_tls, auth_config, &state.rng);
+    }
     if let Some(ref cookie_config) = config.cookie {
         routes_tls = cookie::register(routes_tls, cookie_config);
     }

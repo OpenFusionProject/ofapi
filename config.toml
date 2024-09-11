@@ -11,5 +11,6 @@ port = 443
 route = "/getranks"
 placeholders = true
 
-[auth]
-route = "/auth"
+[cookie]
+route = "/cookie"
+valid_secs = 60

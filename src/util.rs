@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use log::info;
 use sqlite::{Connection, State};
 
@@ -52,4 +54,10 @@ pub fn parse_csv(data: &str) -> Vec<Vec<String>> {
                 .collect()
         })
         .collect()
+}
+
+pub fn as_timestamp(st: SystemTime) -> u64 {
+    st.duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }

@@ -1,17 +1,18 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, OnceLock},
-};
+use std::sync::{Arc, OnceLock};
 
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    routing::post,
+    Json, Router,
+};
 use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey, Validation};
 use log::{info, warn};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sqlite::Connection;
-use tokio::sync::Mutex;
 
-use crate::AppState;
+use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub struct AuthConfig {
@@ -32,7 +33,6 @@ pub struct Claims {
     exp: u64,    // expiration timestamp in UTC
 }
 
-static JWT_CACHE: OnceLock<Mutex<HashMap<i64, String>>> = OnceLock::new();
 static SECRET_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 
 fn check_secret(path: &str, rng: &SystemRandom) {
@@ -59,11 +59,15 @@ pub fn register(
     config: &AuthConfig,
     rng: &SystemRandom,
 ) -> Router<Arc<AppState>> {
+    const CHECK_ROUTE: &str = "/check";
     let route = &config.route;
+    let check_route = format!("{}{}", route, CHECK_ROUTE);
     info!("Registering auth route @ {}", route);
+    info!("Registering auth check route @ {}", check_route);
     check_secret(&config.secret_path, rng);
-    JWT_CACHE.set(Mutex::new(HashMap::new())).unwrap();
-    routes.route(route, post(do_auth))
+    routes
+        .route(route, post(do_auth))
+        .route(&check_route, post(do_check))
 }
 
 fn check_credentials(
@@ -140,23 +144,6 @@ pub fn validate_jwt(jwt: &str) -> Result<i64, String> {
     }
 }
 
-async fn get_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
-    let mut cache = JWT_CACHE.get().unwrap().lock().await;
-    if let Some(jwt) = cache.get(&account_id) {
-        // make sure the token is still valid
-        let secret = SECRET_KEY.get().unwrap();
-        let key = DecodingKey::from_secret(secret);
-        let validation = get_validator(Some(account_id));
-        if jsonwebtoken::decode::<Claims>(jwt, &key, &validation).is_ok() {
-            return Ok(jwt.clone());
-        }
-    }
-
-    let jwt = gen_jwt(account_id, valid_secs)?;
-    cache.insert(account_id, jwt.clone());
-    Ok(jwt)
-}
-
 async fn do_auth(
     State(app): State<Arc<AppState>>,
     Json(req): Json<AuthRequest>,
@@ -166,8 +153,21 @@ async fn do_auth(
     let db = app.db.lock().await;
     let account_id = check_credentials(&db, &req.username, &req.password)?;
     let valid_secs = app.config.auth.as_ref().unwrap().valid_secs;
-    match get_jwt(account_id, valid_secs).await {
+    match gen_jwt(account_id, valid_secs) {
         Ok(jwt) => Ok(jwt),
         Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e)),
+    }
+}
+
+async fn do_check(
+    State(app): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<String, (StatusCode, String)> {
+    assert!(app.is_tls);
+
+    if let Ok(id) = util::validate_authed_request(&headers) {
+        Ok(format!("Account ID: {}", id))
+    } else {
+        Err((StatusCode::UNAUTHORIZED, "Bad token".to_string()))
     }
 }

@@ -1,7 +1,10 @@
 use std::time::SystemTime;
 
+use axum::http::HeaderMap;
 use log::info;
 use sqlite::{Connection, State};
+
+use crate::auth;
 
 pub fn version_to_string(version: usize) -> String {
     // ex: 3045003 -> "3.45.3"
@@ -60,4 +63,19 @@ pub fn as_timestamp(st: SystemTime) -> u64 {
     st.duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+pub fn validate_authed_request(headers: &HeaderMap) -> Result<i64, String> {
+    let auth_header = headers.get("authorization").ok_or("No auth header")?;
+    // auth header uses the Bearer scheme
+    let parts: Vec<&str> = auth_header
+        .to_str()
+        .map_err(|e| e.to_string())?
+        .split(' ')
+        .collect();
+    if parts.len() != 2 || parts[0] != "Bearer" {
+        return Err("Invalid auth header".to_string());
+    }
+    let token = parts[1];
+    auth::validate_jwt(token)
 }

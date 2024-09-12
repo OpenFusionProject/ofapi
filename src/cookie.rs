@@ -68,12 +68,15 @@ fn set_cookie(
 
 async fn get_cookie(
     State(app): State<Arc<AppState>>,
-    _headers: HeaderMap,
+    headers: HeaderMap,
 ) -> Result<Json<CookieResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
 
     let db = app.db.lock().await;
-    let account_id = 1; //check_credentials(&db, &req.username, &req.password)?;
+    let account_id = match util::validate_authed_request(&headers) {
+        Ok(id) => id,
+        Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+    };
 
     let cookie = gen_cookie(&app.rng);
     let valid_secs = app.config.cookie.as_ref().unwrap().valid_secs;

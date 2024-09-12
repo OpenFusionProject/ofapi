@@ -115,14 +115,29 @@ fn gen_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
         .map_err(|e| format!("JWT error: {}", e))
 }
 
-fn get_validator_for_account(account_id: i64) -> Validation {
+fn get_validator(account_id: Option<i64>) -> Validation {
     let mut validation = Validation::default();
     // required claims
     validation.required_spec_claims.insert("exp".to_string());
     validation.required_spec_claims.insert("sub".to_string());
-    // ensure account ID matches
-    validation.sub = Some(account_id.to_string());
+    // ensure account ID matches if passed in
+    validation.sub = account_id.map(|id| id.to_string());
     validation
+}
+
+pub fn validate_jwt(jwt: &str) -> Result<i64, String> {
+    let Some(secret) = SECRET_KEY.get() else {
+        return Err("Auth module not initialized".to_string());
+    };
+    let key = DecodingKey::from_secret(secret);
+    let validation = get_validator(None);
+    let Ok(token) = jsonwebtoken::decode::<Claims>(jwt, &key, &validation) else {
+        return Err("Bad JWT".to_string());
+    };
+    match token.claims.sub.parse() {
+        Ok(id) => Ok(id),
+        Err(e) => Err(format!("Bad account ID: {}", e)),
+    }
 }
 
 async fn get_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
@@ -131,7 +146,7 @@ async fn get_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
         // make sure the token is still valid
         let secret = SECRET_KEY.get().unwrap();
         let key = DecodingKey::from_secret(secret);
-        let validation = get_validator_for_account(account_id);
+        let validation = get_validator(Some(account_id));
         if jsonwebtoken::decode::<Claims>(jwt, &key, &validation).is_ok() {
             return Ok(jwt.clone());
         }

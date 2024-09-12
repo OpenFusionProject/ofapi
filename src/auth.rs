@@ -149,7 +149,6 @@ async fn do_auth(
     Json(req): Json<AuthRequest>,
 ) -> Result<String, (StatusCode, String)> {
     assert!(app.is_tls);
-
     let db = app.db.lock().await;
     let account_id = check_credentials(&db, &req.username, &req.password)?;
     let valid_secs = app.config.auth.as_ref().unwrap().valid_secs;
@@ -159,15 +158,39 @@ async fn do_auth(
     }
 }
 
+fn get_username_from_id(db: &Connection, account_id: i64) -> Result<String, (StatusCode, String)> {
+    const QUERY: &str = "
+        SELECT Login
+        FROM Accounts
+        WHERE AccountID = ?
+        LIMIT 1;
+        ";
+    let mut stmt = db.prepare(QUERY).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("DB error: {}", e),
+        )
+    })?;
+    stmt.bind((1, account_id)).unwrap();
+    if let Ok(sqlite::State::Row) = stmt.next() {
+        let username: String = stmt.read(0).unwrap();
+        Ok(username)
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            format!("Account ID {} not found", account_id),
+        ))
+    }
+}
+
 async fn do_check(
     State(app): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<String, (StatusCode, String)> {
     assert!(app.is_tls);
-
-    if let Ok(id) = util::validate_authed_request(&headers) {
-        Ok(format!("Account ID: {}", id))
-    } else {
-        Err((StatusCode::UNAUTHORIZED, "Bad token".to_string()))
-    }
+    let Ok(account_id) = util::validate_authed_request(&headers) else {
+        return Err((StatusCode::UNAUTHORIZED, "Bad token".to_string()));
+    };
+    let db = app.db.lock().await;
+    get_username_from_id(&db, account_id)
 }

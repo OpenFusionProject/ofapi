@@ -1,4 +1,6 @@
 /target
+/supply-chain
+
 *.db
 *.pem
 secret

@@ -1,18 +1,13 @@
 use std::sync::{Arc, OnceLock};
 
-use axum::{
-    extract::State,
-    http::{HeaderMap, StatusCode},
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey, Validation};
 use log::{info, warn};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sqlite::Connection;
 
-use crate::{util, AppState};
+use crate::AppState;
 
 #[derive(Deserialize, Clone)]
 pub struct AuthConfig {
@@ -59,15 +54,10 @@ pub fn register(
     config: &AuthConfig,
     rng: &SystemRandom,
 ) -> Router<Arc<AppState>> {
-    const CHECK_ROUTE: &str = "/check";
     let route = &config.route;
-    let check_route = format!("{}{}", route, CHECK_ROUTE);
     info!("Registering auth route @ {}", route);
-    info!("Registering auth check route @ {}", check_route);
     check_secret(&config.secret_path, rng);
-    routes
-        .route(route, post(do_auth))
-        .route(&check_route, post(do_check))
+    routes.route(route, post(do_auth))
 }
 
 fn check_credentials(
@@ -156,41 +146,4 @@ async fn do_auth(
         Ok(jwt) => Ok(jwt),
         Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e)),
     }
-}
-
-fn get_username_from_id(db: &Connection, account_id: i64) -> Result<String, (StatusCode, String)> {
-    const QUERY: &str = "
-        SELECT Login
-        FROM Accounts
-        WHERE AccountID = ?
-        LIMIT 1;
-        ";
-    let mut stmt = db.prepare(QUERY).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("DB error: {}", e),
-        )
-    })?;
-    stmt.bind((1, account_id)).unwrap();
-    if let Ok(sqlite::State::Row) = stmt.next() {
-        let username: String = stmt.read(0).unwrap();
-        Ok(username)
-    } else {
-        Err((
-            StatusCode::NOT_FOUND,
-            format!("Account ID {} not found", account_id),
-        ))
-    }
-}
-
-async fn do_check(
-    State(app): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<String, (StatusCode, String)> {
-    assert!(app.is_tls);
-    let Ok(account_id) = util::validate_authed_request(&headers) else {
-        return Err((StatusCode::UNAUTHORIZED, "Bad token".to_string()));
-    };
-    let db = app.db.lock().await;
-    get_username_from_id(&db, account_id)
 }

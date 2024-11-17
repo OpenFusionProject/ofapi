@@ -17,6 +17,10 @@ mod rankinfo;
 mod statics;
 mod util;
 
+const DEFAULT_HTTP_PORT: u16 = 8080;
+const DEFAULT_HTTPS_PORT: u16 = 443;
+const CONFIG_PATH: &str = "config.toml";
+
 #[derive(Deserialize, Clone)]
 struct CoreConfig {
     db_path: String,
@@ -41,7 +45,6 @@ struct Config {
 }
 impl Config {
     fn load() -> Self {
-        const CONFIG_PATH: &str = "config.toml";
         let config = std::fs::read_to_string(CONFIG_PATH).expect("Failed to open config file");
         toml::from_str(&config).expect("Failed to parse config file")
     }
@@ -115,7 +118,6 @@ async fn main() {
 const BIND_IP: [u8; 4] = [127, 0, 0, 1];
 
 async fn init_http(routes: Router<Arc<AppState>>, config: &Config, state: AppState) {
-    const DEFAULT_HTTP_PORT: u16 = 80;
     let addr = SocketAddr::from((BIND_IP, config.core.port.unwrap_or(DEFAULT_HTTP_PORT)));
 
     let app = routes.with_state(Arc::new(state));
@@ -126,8 +128,6 @@ async fn init_http(routes: Router<Arc<AppState>>, config: &Config, state: AppSta
 }
 
 async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: AppState) {
-    const DEFAULT_HTTPS_PORT: u16 = 443;
-
     state.is_tls = true;
     let app = routes.with_state(Arc::new(state));
 
@@ -172,7 +172,7 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
 
 async fn get_info(State(state): State<Arc<AppState>>) -> String {
     format!(
-        "OFAPI v{}\ntls: {:?}",
+        "OFAPI v{}\ntls: {:?}\n",
         env!("CARGO_PKG_VERSION"),
         state.is_tls
     )

@@ -1,15 +1,15 @@
 [core]
 db_path = "../OpenFusion/database.db"
-port = 80
+port = 8080
 
-[tls]
-cert_path = "cert.pem" # app-level TLS only
-key_path = "key.pem" # app-level TLS only
-port = 443
+# [tls]
+# cert_path = "cert.pem" # app-level TLS only
+# key_path = "key.pem" # app-level TLS only
+# port = 443
 
 [rankinfo]
 route = "/getranks"
-placeholders = true
+placeholders = false
 
 [auth]
 route = "/auth"

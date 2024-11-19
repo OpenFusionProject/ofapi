@@ -2,10 +2,11 @@
 db_path = "../OpenFusion/database.db"
 port = 8080
 
-# [tls]
-# cert_path = "cert.pem" # app-level TLS only
-# key_path = "key.pem" # app-level TLS only
-# port = 443
+# App-terminated TLS, as opposed to proxy-terminated TLS.
+[app_tls]
+cert_path = "cert.pem"
+key_path = "key.pem"
+port = 443
 
 [rankinfo]
 route = "/getranks"

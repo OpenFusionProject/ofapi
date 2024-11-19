@@ -148,7 +148,6 @@ async fn do_auth(
     State(app): State<Arc<AppState>>,
     Json(req): Json<AuthRequest>,
 ) -> Result<String, (StatusCode, String)> {
-    assert!(app.is_tls);
     let db = app.db.lock().await;
     let account_id = check_credentials(&db, &req.username, &req.password)?;
     let valid_secs = app.config.auth.as_ref().unwrap().valid_secs;
@@ -187,7 +186,6 @@ async fn do_check(
     State(app): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<String, (StatusCode, String)> {
-    assert!(app.is_tls);
     let Ok(account_id) = util::validate_authed_request(&headers) else {
         return Err((StatusCode::UNAUTHORIZED, "Bad token".to_string()));
     };

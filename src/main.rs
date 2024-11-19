@@ -8,7 +8,7 @@ use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tokio::sync::Mutex;
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "app-tls")]
 use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
 
 mod auth;
@@ -18,8 +18,10 @@ mod statics;
 mod util;
 
 const DEFAULT_HTTP_PORT: u16 = 8080;
-const DEFAULT_HTTPS_PORT: u16 = 443;
 const CONFIG_PATH: &str = "config.toml";
+
+#[cfg(feature = "app-tls")]
+const DEFAULT_HTTPS_PORT: u16 = 443;
 
 #[derive(Deserialize, Clone)]
 struct CoreConfig {
@@ -38,7 +40,7 @@ struct TlsConfig {
 #[derive(Deserialize, Clone)]
 struct Config {
     core: CoreConfig,
-    tls: Option<TlsConfig>,
+    app_tls: Option<TlsConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,
     auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
@@ -54,7 +56,6 @@ impl Config {
 struct AppState {
     db: Arc<Mutex<Connection>>,
     rng: Arc<SystemRandom>,
-    is_tls: bool,
     config: Config,
 }
 impl AppState {
@@ -67,9 +68,18 @@ impl AppState {
         Self {
             db: Arc::new(Mutex::new(conn)),
             rng: Arc::new(SystemRandom::new()),
-            is_tls: false,
             config: config.clone(),
         }
+    }
+
+    fn is_using_app_tls(self: &Self) -> bool {
+        #[cfg(not(feature = "app-tls"))]
+        {
+            return false;
+        }
+
+        #[allow(unreachable_code)]
+        self.config.app_tls.is_some()
     }
 }
 
@@ -99,20 +109,44 @@ async fn main() {
         routes = rankinfo::register(routes, rankinfo_config);
     }
 
-    // register HTTPS-only endpoints
-    let mut routes_tls = Router::new().merge(routes.clone());
+    // register secure endpoints
+    let mut routes_secure = Router::new();
     if let Some(ref auth_config) = config.auth {
-        routes_tls = auth::register(routes_tls, auth_config, &state.rng);
+        routes_secure = auth::register(routes_secure, auth_config, &state.rng);
     }
     if let Some(ref cookie_config) = config.cookie {
-        routes_tls = cookie::register(routes_tls, cookie_config);
+        routes_secure = cookie::register(routes_secure, cookie_config);
     }
 
-    // init both protocols
-    // N.B. these listen concurrently, but NOT in parallel (see tokio::join!)
-    let http = init_http(routes, &config, state.clone());
-    let https = init_https(routes_tls, &config, state);
-    let _ = tokio::join!(http, https);
+    #[cfg(not(feature = "app-tls"))]
+    {
+        warn!("OFAPI was not compiled with the `app-tls` feature. Encryption should be done at the proxy level!");
+
+        let routes = Router::new().merge(routes).merge(routes_secure);
+        let http = init_http(routes, &config, state.clone());
+        let _ = tokio::join!(http);
+    }
+
+    #[cfg(feature = "app-tls")]
+    {
+        info!("Using application-level TLS termination.");
+
+        // init secure endpoints on a separate port
+        // N.B. these listen concurrently, but NOT in parallel (see tokio::join!)
+
+        if state.is_using_app_tls() {
+            let routes_secure = Router::new().merge(routes.clone()).merge(routes_secure);
+            let http = init_http(routes, &config, state.clone());
+            let https = init_https(routes_secure, &config, state);
+            let _ = tokio::join!(http, https);
+        } else {
+            warn!("Application-level TLS termination disabled. Encryption should be done at the proxy level!");
+
+            let routes = Router::new().merge(routes).merge(routes_secure);
+            let http = init_http(routes, &config, state.clone());
+            let _ = tokio::join!(http);
+        }
+    }
 }
 
 const BIND_IP: [u8; 4] = [127, 0, 0, 1];
@@ -127,53 +161,39 @@ async fn init_http(routes: Router<Arc<AppState>>, config: &Config, state: AppSta
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: AppState) {
-    state.is_tls = true;
+#[cfg(feature = "app-tls")]
+async fn init_https(routes: Router<Arc<AppState>>, config: &Config, state: AppState) {
     let app = routes.with_state(Arc::new(state));
 
-    let Some(ref tls_config) = config.tls else {
+    let Some(ref tls_config) = config.app_tls else {
         warn!("Missing or malformed TLS config. HTTPS disabled");
         return;
     };
 
     let addr = SocketAddr::from((BIND_IP, tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT)));
 
-    #[cfg(not(feature = "tls"))]
-    {
-        warn!("TLS APIs enabled but OFAPI was not compiled with the `tls` feature. Encryption should be done at the proxy level!");
-    }
-
     info!("HTTPS listening on {}", addr);
 
-    #[cfg(feature = "tls")]
-    {
-        ring::default_provider().install_default().unwrap();
-        let rustls_cfg =
-            match RustlsConfig::from_pem_file(&tls_config.cert_path, &tls_config.key_path).await {
-                Err(e) => {
-                    warn!("Failed to activate TLS ({}); HTTPS disabled", e);
-                    return;
-                }
-                Ok(cfg) => cfg,
-            };
+    ring::default_provider().install_default().unwrap();
+    let rustls_cfg =
+        match RustlsConfig::from_pem_file(&tls_config.cert_path, &tls_config.key_path).await {
+            Err(e) => {
+                warn!("Failed to activate TLS ({}); HTTPS disabled", e);
+                return;
+            }
+            Ok(cfg) => cfg,
+        };
 
-        axum_server::bind_rustls(addr, rustls_cfg)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    }
-
-    #[cfg(not(feature = "tls"))]
-    {
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        axum::serve(listener, app).await.unwrap();
-    }
+    axum_server::bind_rustls(addr, rustls_cfg)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
 
 async fn get_info(State(state): State<Arc<AppState>>) -> String {
     format!(
         "OFAPI v{}\ntls: {:?}\n",
         env!("CARGO_PKG_VERSION"),
-        state.is_tls
+        state.is_using_app_tls()
     )
 }

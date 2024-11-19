@@ -70,8 +70,6 @@ async fn get_cookie(
     State(app): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<CookieResponse>, (StatusCode, String)> {
-    assert!(app.is_tls);
-
     let db = app.db.lock().await;
     let account_id = match util::validate_authed_request(&headers) {
         Ok(id) => id,

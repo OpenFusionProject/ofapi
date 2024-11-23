@@ -22,6 +22,7 @@ pub fn register(mut routes: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         let path = &mapping[1];
         if path.ends_with('/') {
             // serve directory
+            let _ = std::fs::create_dir_all(path);
             routes = routes.route_service(route, ServeDir::new(path));
             info!("\t{}/* => {}*", route, path);
         } else {

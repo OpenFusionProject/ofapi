@@ -1,5 +1,6 @@
 /target
 /supply-chain
+/static
 
 *.db
 *.pem

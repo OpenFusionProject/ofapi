@@ -1,11 +1,19 @@
 [core]
 db_path = "../OpenFusion/database.db"
-port = 80
+port = 8888
 
 [tls]
 cert_path = "cert.pem" # app-level TLS only
 key_path = "key.pem" # app-level TLS only
-port = 443
+port = 4433
+
+[game]
+# GUID of the game version expected by the OpenFusion server.
+# If this identifies a custom version, you should include the
+# manifest for it in the `versions` directory.
+version = "00000000-0000-0000-0000-000000000000"
+# Hostname and login port of the OpenFusion server to advertise
+login_address = "play.myserver.xyz:23000"
 
 [rankinfo]
 route = "/getranks"

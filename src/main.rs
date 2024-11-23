@@ -1,9 +1,9 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use ::ring::rand::SystemRandom;
-use axum::{extract::State, routing::get, Router};
+use axum::{extract::State, routing::get, Json, Router};
 use log::{info, warn};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tokio::sync::Mutex;
@@ -32,9 +32,16 @@ struct TlsConfig {
 }
 
 #[derive(Deserialize, Clone)]
+struct GameConfig {
+    version: String,
+    login_address: String,
+}
+
+#[derive(Deserialize, Clone)]
 struct Config {
     core: CoreConfig,
     tls: Option<TlsConfig>,
+    game: GameConfig,
     rankinfo: Option<rankinfo::RankInfoConfig>,
     auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
@@ -170,10 +177,20 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
     }
 }
 
-async fn get_info(State(state): State<Arc<AppState>>) -> String {
-    format!(
-        "OFAPI v{}\ntls: {:?}",
-        env!("CARGO_PKG_VERSION"),
-        state.is_tls
-    )
+#[derive(Serialize, Deserialize)]
+pub struct InfoResponse {
+    pub api_version: String,
+    pub secure_apis_enabled: bool,
+    pub game_version: String,
+    pub login_address: String,
+}
+
+async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
+    let info = InfoResponse {
+        api_version: env!("CARGO_PKG_VERSION").to_string(),
+        secure_apis_enabled: state.is_tls,
+        game_version: state.config.game.version.clone(),
+        login_address: state.config.game.login_address.clone(),
+    };
+    Json(info)
 }

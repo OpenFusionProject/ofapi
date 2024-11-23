@@ -23,7 +23,7 @@ pub fn register(mut routes: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         if path.ends_with('/') {
             // serve directory
             let _ = std::fs::create_dir_all(path);
-            routes = routes.route_service(route, ServeDir::new(path));
+            routes = routes.nest_service(route, ServeDir::new(path));
             info!("\t{}/* => {}*", route, path);
         } else {
             // serve single file

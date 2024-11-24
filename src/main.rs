@@ -13,6 +13,7 @@ use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
 
 mod auth;
 mod cookie;
+mod monitor;
 mod rankinfo;
 mod statics;
 mod util;
@@ -42,6 +43,7 @@ struct Config {
     core: CoreConfig,
     tls: Option<TlsConfig>,
     game: GameConfig,
+    monitor: Option<monitor::MonitorConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,
     auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
@@ -101,6 +103,9 @@ async fn main() {
     routes = statics::register(routes);
     if let Some(ref rankinfo_config) = config.rankinfo {
         routes = rankinfo::register(routes, rankinfo_config);
+    }
+    if let Some(ref monitor_config) = config.monitor {
+        routes = monitor::register(routes, monitor_config);
     }
 
     // register HTTPS-only endpoints

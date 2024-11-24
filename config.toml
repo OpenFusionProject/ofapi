@@ -15,6 +15,10 @@ version = "00000000-0000-0000-0000-000000000000"
 # Hostname and login port of the OpenFusion server to advertise
 login_address = "play.myserver.xyz:23000"
 
+[monitor]
+route = "/status"
+monitor_ip = "127.0.0.1:8003"
+
 [rankinfo]
 route = "/getranks"
 placeholders = true

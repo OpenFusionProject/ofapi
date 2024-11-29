@@ -5,9 +5,8 @@ use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey, Validation};
 use log::{info, warn};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use sqlite::Connection;
 
-use crate::AppState;
+use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub struct AuthConfig {
@@ -60,43 +59,6 @@ pub fn register(
     routes.route(route, post(do_auth))
 }
 
-fn check_credentials(
-    db: &Connection,
-    username: &str,
-    password: &str,
-) -> Result<i64, (StatusCode, String)> {
-    const QUERY: &str = "
-        SELECT AccountID, Password
-        FROM Accounts
-        WHERE Login = ?
-        LIMIT 1;
-        ";
-    let mut stmt = db.prepare(QUERY).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("DB error: {}", e),
-        )
-    })?;
-    stmt.bind((1, username)).unwrap();
-    if let Ok(sqlite::State::Row) = stmt.next() {
-        let account_id: i64 = stmt.read(0).unwrap();
-        let hashed_password: String = stmt.read(1).unwrap();
-        match bcrypt::verify(password, &hashed_password) {
-            Ok(true) => Ok(account_id),
-            Ok(false) => Err((StatusCode::UNAUTHORIZED, "Invalid password".to_string())),
-            Err(e) => Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("bcrypt error: {}", e),
-            )),
-        }
-    } else {
-        Err((
-            StatusCode::NOT_FOUND,
-            format!("User {} not found", username),
-        ))
-    }
-}
-
 fn gen_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
     let secret = SECRET_KEY.get().unwrap();
     let key = EncodingKey::from_secret(secret);
@@ -140,10 +102,19 @@ async fn do_auth(
 ) -> Result<String, (StatusCode, String)> {
     assert!(app.is_tls);
     let db = app.db.lock().await;
-    let account_id = check_credentials(&db, &req.username, &req.password)?;
+    let account_id = util::check_credentials(&db, &req.username, &req.password).map_err(|e| {
+        warn!("Auth error: {}", e);
+        (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string())
+    })?;
     let valid_secs = app.config.auth.as_ref().unwrap().valid_secs;
     match gen_jwt(account_id, valid_secs) {
         Ok(jwt) => Ok(jwt),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e)),
+        Err(e) => {
+            warn!("Auth error: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            ))
+        }
     }
 }

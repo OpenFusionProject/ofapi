@@ -79,3 +79,25 @@ pub fn validate_authed_request(headers: &HeaderMap) -> Result<i64, String> {
     let token = parts[1];
     auth::validate_jwt(token)
 }
+
+pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Result<i64, String> {
+    const QUERY: &str = "
+        SELECT AccountID, Password
+        FROM Accounts
+        WHERE Login = ?
+        LIMIT 1;
+        ";
+    let mut stmt = db.prepare(QUERY).map_err(|e| format!("DB error: {}", e))?;
+    stmt.bind((1, username)).unwrap();
+    if let Ok(sqlite::State::Row) = stmt.next() {
+        let account_id: i64 = stmt.read(0).unwrap();
+        let hashed_password: String = stmt.read(1).unwrap();
+        match bcrypt::verify(password, &hashed_password) {
+            Ok(true) => Ok(account_id),
+            Ok(false) => Err("Invalid password".to_string()),
+            Err(e) => Err(format!("bcrypt error: {}", e)),
+        }
+    } else {
+        Err(format!("User {} not found", username))
+    }
+}

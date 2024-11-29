@@ -6,6 +6,8 @@ use sqlite::{Connection, State};
 
 use crate::auth;
 
+const MIN_DATABASE_VERSION: i64 = 6;
+
 pub fn version_to_string(version: usize) -> String {
     // ex: 3045003 -> "3.45.3"
     let major = version / 1000000;
@@ -16,6 +18,7 @@ pub fn version_to_string(version: usize) -> String {
 
 pub fn connect_to_db(path: &str) -> Connection {
     const QUERY: &str = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Meta';";
+    const VERSION_QUERY: &str = "SELECT Value FROM Meta WHERE Key = 'DatabaseVersion';";
 
     // check if the db exists first
     if !std::path::Path::new(path).exists() {
@@ -34,7 +37,22 @@ pub fn connect_to_db(path: &str) -> Connection {
     }
     drop(stmt);
 
-    info!("Connected to database");
+    // check the version
+    let mut stmt = conn.prepare(VERSION_QUERY).unwrap();
+    let Ok(State::Row) = stmt.next() else {
+        panic!("Could not get database version");
+    };
+    let version: i64 = stmt.read(0).unwrap();
+    drop(stmt);
+
+    if version < MIN_DATABASE_VERSION {
+        panic!(
+            "Database version too low: {} (Must be at least {})",
+            version, MIN_DATABASE_VERSION
+        );
+    }
+
+    info!("Connected to database (version {})", version);
     conn
 }
 

@@ -8,6 +8,15 @@ use crate::auth;
 
 const MIN_DATABASE_VERSION: i64 = 6;
 
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct Account {
+    id: i64,
+    login: String,
+    password_hashed: String,
+    email: String,
+}
+
 pub fn version_to_string(version: usize) -> String {
     // ex: 3045003 -> "3.45.3"
     let major = version / 1000000;
@@ -98,24 +107,32 @@ pub fn validate_authed_request(headers: &HeaderMap) -> Result<i64, String> {
     auth::validate_jwt(token)
 }
 
-pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Result<i64, String> {
+pub fn find_account(db: &Connection, username: &str) -> Option<Account> {
     const QUERY: &str = "
-        SELECT AccountID, Password
+        SELECT AccountID, Login, Password, Email
         FROM Accounts
         WHERE Login = ?
         LIMIT 1;
         ";
-    let mut stmt = db.prepare(QUERY).map_err(|e| format!("DB error: {}", e))?;
+    let mut stmt = db.prepare(QUERY).unwrap();
     stmt.bind((1, username)).unwrap();
     if let Ok(sqlite::State::Row) = stmt.next() {
-        let account_id: i64 = stmt.read(0).unwrap();
-        let hashed_password: String = stmt.read(1).unwrap();
-        match bcrypt::verify(password, &hashed_password) {
-            Ok(true) => Ok(account_id),
-            Ok(false) => Err("Invalid password".to_string()),
-            Err(e) => Err(format!("bcrypt error: {}", e)),
-        }
+        Some(Account {
+            id: stmt.read(0).unwrap(),
+            login: stmt.read(1).unwrap(),
+            password_hashed: stmt.read(2).unwrap(),
+            email: stmt.read(3).unwrap(),
+        })
     } else {
-        Err(format!("User {} not found", username))
+        None
+    }
+}
+
+pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Result<i64, String> {
+    let account = find_account(db, username).ok_or("Account not found")?;
+    match bcrypt::verify(password, &account.password_hashed) {
+        Ok(true) => Ok(account.id),
+        Ok(false) => Err("Invalid password".to_string()),
+        Err(e) => Err(format!("bcrypt error: {}", e)),
     }
 }

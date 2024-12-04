@@ -34,7 +34,7 @@ struct TlsConfig {
 
 #[derive(Deserialize, Clone)]
 struct GameConfig {
-    version: String,
+    versions: Vec<String>,
     login_address: String,
 }
 
@@ -186,7 +186,7 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
 pub struct InfoResponse {
     pub api_version: String,
     pub secure_apis_enabled: bool,
-    pub game_version: String,
+    pub game_versions: Vec<String>,
     pub login_address: String,
 }
 
@@ -194,7 +194,7 @@ async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
     let info = InfoResponse {
         api_version: env!("CARGO_PKG_VERSION").to_string(),
         secure_apis_enabled: state.is_tls,
-        game_version: state.config.game.version.clone(),
+        game_versions: state.config.game.versions.clone(),
         login_address: state.config.game.login_address.clone(),
     };
     Json(info)

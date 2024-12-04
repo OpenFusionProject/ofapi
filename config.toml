@@ -8,10 +8,10 @@ key_path = "key.pem" # app-level TLS only
 port = 4433
 
 [game]
-# GUID of the game version expected by the OpenFusion server.
-# If this identifies a custom version, you should include the
-# manifest for it in the `versions` directory.
-version = "00000000-0000-0000-0000-000000000000"
+# GUID of the game versions compatible the OpenFusion server.
+# If this identifies any custom versions, you should include the
+# manifest for each one in the `versions` directory.
+versions = ["ec8063b2-54d4-4ee1-8d9e-381f5babd420"]
 # Hostname and login port of the OpenFusion server to advertise
 login_address = "play.myserver.xyz:23000"
 

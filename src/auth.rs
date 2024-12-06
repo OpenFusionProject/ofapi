@@ -24,6 +24,7 @@ pub struct AuthRequest {
 #[derive(Deserialize, Serialize)]
 pub struct Claims {
     sub: String, // account id as a string
+    crt: u64,    // creation timestamp in UTC
     exp: u64,    // expiration timestamp in UTC
 }
 
@@ -62,9 +63,11 @@ pub fn register(
 fn gen_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
     let secret = SECRET_KEY.get().unwrap();
     let key = EncodingKey::from_secret(secret);
-    let exp = get_current_timestamp() + valid_secs;
+    let crt = get_current_timestamp();
+    let exp = crt + valid_secs;
     let claims = Claims {
         sub: account_id.to_string(),
+        crt,
         exp,
     };
     jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &key)
@@ -74,6 +77,7 @@ fn gen_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
 fn get_validator(account_id: Option<i64>) -> Validation {
     let mut validation = Validation::default();
     // required claims
+    validation.required_spec_claims.insert("crt".to_string());
     validation.required_spec_claims.insert("exp".to_string());
     validation.required_spec_claims.insert("sub".to_string());
     // ensure account ID matches if passed in

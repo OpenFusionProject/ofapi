@@ -89,11 +89,19 @@ pub fn validate_jwt(jwt: &str) -> Result<i64, String> {
     let Some(secret) = SECRET_KEY.get() else {
         return Err("Auth module not initialized".to_string());
     };
+
     let key = DecodingKey::from_secret(secret);
     let validation = get_validator(None);
     let Ok(token) = jsonwebtoken::decode::<Claims>(jwt, &key, &validation) else {
         return Err("Bad JWT".to_string());
     };
+
+    // I don't 100% trust this crate to validate the expiration timestamp, so do it manually
+    let now = get_current_timestamp();
+    if token.claims.exp < now {
+        return Err("Expired JWT".to_string());
+    }
+
     match token.claims.sub.parse() {
         Ok(id) => Ok(id),
         Err(e) => Err(format!("Bad account ID: {}", e)),

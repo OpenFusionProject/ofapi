@@ -25,8 +25,12 @@ placeholders = true
 
 [auth]
 route = "/auth"
+refresh_subroute = "/session"
 secret_path = "secret"
-valid_secs = 604_800 # one week
+# Session tokens are used to authenticate requests. They should be short-lived.
+# Refresh tokens are used to generate new session tokens. They should be long-lived and cached by clients.
+valid_secs_refresh = 604_800 # one week
+valid_secs_session = 900 # 15 minutes
 
 [cookie]
 route = "/cookie"

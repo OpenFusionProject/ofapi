@@ -2,7 +2,7 @@ use axum::http::HeaderMap;
 use log::info;
 use sqlite::{Connection, State};
 
-use crate::auth;
+use crate::auth::{self, TokenKind};
 
 const MIN_DATABASE_VERSION: i64 = 6;
 
@@ -21,6 +21,12 @@ pub fn version_to_string(version: usize) -> String {
     let minor = (version % 1000000) / 1000;
     let patch = version % 1000;
     format!("{}.{}.{}", major, minor, patch)
+}
+
+pub fn get_subroute(route: &str, subroute: &str) -> String {
+    let route_noslash = route.trim_end_matches('/');
+    let subroute_noslash = subroute.trim_start_matches('/');
+    format!("{}/{}", route_noslash, subroute_noslash)
 }
 
 pub fn connect_to_db(path: &str) -> Connection {
@@ -84,7 +90,7 @@ pub fn parse_csv(data: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-pub fn validate_authed_request(headers: &HeaderMap) -> Result<i64, String> {
+pub fn validate_authed_request(headers: &HeaderMap, kind: TokenKind) -> Result<i64, String> {
     let auth_header = headers.get("authorization").ok_or("No auth header")?;
     // auth header uses the Bearer scheme
     let parts: Vec<&str> = auth_header
@@ -96,7 +102,7 @@ pub fn validate_authed_request(headers: &HeaderMap) -> Result<i64, String> {
         return Err("Invalid auth header".to_string());
     }
     let token = parts[1];
-    auth::validate_jwt(token)
+    auth::validate_jwt(token, kind)
 }
 
 pub fn find_account(db: &Connection, username: &str) -> Option<Account> {

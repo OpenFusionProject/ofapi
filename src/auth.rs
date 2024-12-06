@@ -1,18 +1,26 @@
 use std::sync::{Arc, OnceLock};
 
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    routing::post,
+    Json, Router,
+};
 use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey, Validation};
 use log::{info, warn};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub struct AuthConfig {
     route: String,
+    refresh_subroute: String,
     secret_path: String,
-    valid_secs: u64,
+    valid_secs_refresh: u64,
+    valid_secs_session: u64,
 }
 
 #[derive(Deserialize)]
@@ -21,11 +29,19 @@ pub struct AuthRequest {
     password: String,
 }
 
+#[repr(u8)]
+#[derive(Deserialize_repr, Serialize_repr, PartialEq, Eq)]
+pub enum TokenKind {
+    Refresh = 0,
+    Session = 1,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct Claims {
-    sub: String, // account id as a string
-    crt: u64,    // creation timestamp in UTC
-    exp: u64,    // expiration timestamp in UTC
+    sub: String,     // account id as a string
+    crt: u64,        // creation timestamp in UTC
+    exp: u64,        // expiration timestamp in UTC
+    kind: TokenKind, // kind of token
 }
 
 static SECRET_KEY: OnceLock<Vec<u8>> = OnceLock::new();
@@ -55,21 +71,33 @@ pub fn register(
     rng: &SystemRandom,
 ) -> Router<Arc<AppState>> {
     let route = &config.route;
+    let refresh_route = util::get_subroute(route, &config.refresh_subroute);
     info!("Registering auth route @ {}", route);
+    info!("\tRefresh route @ {}", refresh_route);
     check_secret(&config.secret_path, rng);
-    routes.route(route, post(do_auth))
+    routes
+        .route(route, post(do_auth))
+        .route(&refresh_route, post(do_refresh))
 }
 
-fn gen_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
+fn gen_jwt(auth_config: &AuthConfig, account_id: i64, kind: TokenKind) -> Result<String, String> {
     let secret = SECRET_KEY.get().unwrap();
     let key = EncodingKey::from_secret(secret);
+
+    let valid_secs = match kind {
+        TokenKind::Refresh => auth_config.valid_secs_refresh,
+        TokenKind::Session => auth_config.valid_secs_session,
+    };
+
     let crt = get_current_timestamp();
     let exp = crt + valid_secs;
     let claims = Claims {
         sub: account_id.to_string(),
         crt,
         exp,
+        kind,
     };
+
     jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &key)
         .map_err(|e| format!("JWT error: {}", e))
 }
@@ -77,15 +105,14 @@ fn gen_jwt(account_id: i64, valid_secs: u64) -> Result<String, String> {
 fn get_validator(account_id: Option<i64>) -> Validation {
     let mut validation = Validation::default();
     // required claims
-    validation.required_spec_claims.insert("crt".to_string());
-    validation.required_spec_claims.insert("exp".to_string());
     validation.required_spec_claims.insert("sub".to_string());
+    validation.required_spec_claims.insert("exp".to_string());
     // ensure account ID matches if passed in
     validation.sub = account_id.map(|id| id.to_string());
     validation
 }
 
-pub fn validate_jwt(jwt: &str) -> Result<i64, String> {
+pub fn validate_jwt(jwt: &str, kind: TokenKind) -> Result<i64, String> {
     let Some(secret) = SECRET_KEY.get() else {
         return Err("Auth module not initialized".to_string());
     };
@@ -100,6 +127,10 @@ pub fn validate_jwt(jwt: &str) -> Result<i64, String> {
     let now = get_current_timestamp();
     if token.claims.exp < now {
         return Err("Expired JWT".to_string());
+    }
+
+    if token.claims.kind != kind {
+        return Err("Bad token kind".to_string());
     }
 
     match token.claims.sub.parse() {
@@ -118,11 +149,41 @@ async fn do_auth(
         warn!("Auth error: {}", e);
         (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string())
     })?;
-    let valid_secs = app.config.auth.as_ref().unwrap().valid_secs;
-    match gen_jwt(account_id, valid_secs) {
+    match gen_jwt(
+        app.config.auth.as_ref().unwrap(),
+        account_id,
+        TokenKind::Refresh,
+    ) {
         Ok(jwt) => Ok(jwt),
         Err(e) => {
             warn!("Auth error: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            ))
+        }
+    }
+}
+
+async fn do_refresh(
+    State(app): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<String, (StatusCode, String)> {
+    assert!(app.is_tls);
+    let db = app.db.lock().await;
+    // TODO validate the refresh token against the last password reset timestamp
+    let account_id = match util::validate_authed_request(&headers, TokenKind::Refresh) {
+        Ok(id) => id,
+        Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+    };
+    match gen_jwt(
+        app.config.auth.as_ref().unwrap(),
+        account_id,
+        TokenKind::Session,
+    ) {
+        Ok(jwt) => Ok(jwt),
+        Err(e) => {
+            warn!("Refresh error: {}", e);
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Server error".to_string(),

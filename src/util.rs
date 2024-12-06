@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use axum::http::HeaderMap;
 use log::info;
 use sqlite::{Connection, State};
@@ -84,12 +82,6 @@ pub fn parse_csv(data: &str) -> Vec<Vec<String>> {
                 .collect()
         })
         .collect()
-}
-
-pub fn as_timestamp(st: SystemTime) -> u64 {
-    st.duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
 }
 
 pub fn validate_authed_request(headers: &HeaderMap) -> Result<i64, String> {

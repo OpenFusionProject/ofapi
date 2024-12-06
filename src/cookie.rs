@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::sync::Arc;
 
 use axum::{
     extract::State,
@@ -10,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
+use jsonwebtoken::get_current_timestamp;
 use log::info;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
@@ -54,9 +52,7 @@ fn set_cookie(
     const QUERY: &str =
         "INSERT OR REPLACE INTO Auth (AccountID, Cookie, Expires) VALUES (?, ?, ?);";
 
-    let valid_for = Duration::from_secs(valid_secs);
-    let expires = SystemTime::now() + valid_for;
-    let expires_timestamp = util::as_timestamp(expires);
+    let expires_timestamp = get_current_timestamp() + valid_secs;
 
     let mut stmt = db.prepare(QUERY)?;
     stmt.bind((1, account_id)).unwrap();

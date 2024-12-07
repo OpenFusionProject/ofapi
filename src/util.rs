@@ -10,9 +10,9 @@ const MIN_DATABASE_VERSION: i64 = 6;
 #[derive(Debug)]
 pub struct Account {
     id: i64,
-    login: String,
-    password_hashed: String,
-    email: String,
+    pub login: String,
+    pub password_hashed: String,
+    pub email: String,
 }
 
 pub fn version_to_string(version: usize) -> String {
@@ -105,7 +105,28 @@ pub fn validate_authed_request(headers: &HeaderMap, kind: TokenKind) -> Result<i
     auth::validate_jwt(token, kind)
 }
 
-pub fn find_account(db: &Connection, username: &str) -> Option<Account> {
+pub fn find_account(db: &Connection, account_id: i64) -> Option<Account> {
+    const QUERY: &str = "
+        SELECT AccountID, Login, Password, Email
+        FROM Accounts
+        WHERE AccountID = ?
+        LIMIT 1;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, account_id)).unwrap();
+    if let Ok(State::Row) = stmt.next() {
+        Some(Account {
+            id: stmt.read(0).unwrap(),
+            login: stmt.read(1).unwrap(),
+            password_hashed: stmt.read(2).unwrap(),
+            email: stmt.read(3).unwrap(),
+        })
+    } else {
+        None
+    }
+}
+
+pub fn find_account_by_username(db: &Connection, username: &str) -> Option<Account> {
     const QUERY: &str = "
         SELECT AccountID, Login, Password, Email
         FROM Accounts
@@ -127,7 +148,7 @@ pub fn find_account(db: &Connection, username: &str) -> Option<Account> {
 }
 
 pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Result<i64, String> {
-    let account = find_account(db, username).ok_or("Account not found")?;
+    let account = find_account_by_username(db, username).ok_or("Account not found")?;
     match bcrypt::verify(password, &account.password_hashed) {
         Ok(true) => Ok(account.id),
         Ok(false) => Err("Invalid password".to_string()),

@@ -8,7 +8,7 @@ use axum::{
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
 use jsonwebtoken::get_current_timestamp;
-use log::info;
+use log::*;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sqlite::Connection;
@@ -23,6 +23,7 @@ pub struct CookieConfig {
 
 #[derive(Serialize)]
 pub struct CookieResponse {
+    username: String,
     cookie: String,
     expires: u64,
 }
@@ -67,8 +68,6 @@ async fn get_cookie(
     headers: HeaderMap,
 ) -> Result<Json<CookieResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-
-    let db = app.db.lock().await;
     let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
         Ok(id) => id,
         Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
@@ -76,11 +75,28 @@ async fn get_cookie(
 
     let cookie = gen_cookie(&app.rng);
     let valid_secs = app.config.cookie.as_ref().unwrap().valid_secs;
-    let expires = set_cookie(&db, account_id, &cookie, valid_secs).map_err(|e| {
+
+    let db = app.db.lock().await;
+    let username = match util::find_account(&db, account_id) {
+        Some(a) => a.login,
+        None => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            ))
+        }
+    };
+
+    let expires = set_cookie(&db, account_id, &cookie, valid_secs).map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("DB error: {}", e),
+            "Server error".to_string(),
         )
     })?;
-    Ok(Json(CookieResponse { cookie, expires }))
+
+    Ok(Json(CookieResponse {
+        username,
+        cookie,
+        expires,
+    }))
 }

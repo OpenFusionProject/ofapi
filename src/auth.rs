@@ -165,23 +165,44 @@ async fn do_auth(
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct RefreshResponse {
+    username: String,
+    session_token: String,
+}
+
 async fn do_refresh(
     State(app): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<RefreshResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-    let db = app.db.lock().await;
-    // TODO validate the refresh token against the last password reset timestamp
     let account_id = match util::validate_authed_request(&headers, TokenKind::Refresh) {
         Ok(id) => id,
         Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
     };
+
+    let db = app.db.lock().await;
+    let username = match util::find_account(&db, account_id) {
+        Some(a) => a.login,
+        None => {
+            warn!("Account not found: {} (refresh)", account_id);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            ));
+        }
+    };
+    // TODO validate the refresh token against the last password reset timestamp
+
     match gen_jwt(
         app.config.auth.as_ref().unwrap(),
         account_id,
         TokenKind::Session,
     ) {
-        Ok(jwt) => Ok(jwt),
+        Ok(jwt) => Ok(Json(RefreshResponse {
+            username,
+            session_token: jwt,
+        })),
         Err(e) => {
             warn!("Refresh error: {}", e);
             Err((

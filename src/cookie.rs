@@ -13,7 +13,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sqlite::Connection;
 
-use crate::{auth::TokenKind, util, AppState};
+use crate::{auth::TokenKind, database, util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub struct CookieConfig {
@@ -77,7 +77,7 @@ async fn get_cookie(
     let valid_secs = app.config.cookie.as_ref().unwrap().valid_secs;
 
     let db = app.db.lock().await;
-    let username = match util::find_account(&db, account_id) {
+    let username = match database::find_account(&db, account_id) {
         Some(a) => a.login,
         None => {
             return Err((

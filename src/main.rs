@@ -16,6 +16,8 @@ mod cookie;
 mod monitor;
 mod rankinfo;
 mod statics;
+
+mod database;
 mod util;
 
 #[derive(Deserialize, Clone)]
@@ -69,7 +71,7 @@ impl AppState {
             "SQLite version {}",
             util::version_to_string(sqlite::version())
         );
-        let conn = util::connect_to_db(&config.core.db_path);
+        let conn = database::connect_to_db(&config.core.db_path);
         Self {
             db: Arc::new(Mutex::new(conn)),
             rng: Arc::new(SystemRandom::new()),

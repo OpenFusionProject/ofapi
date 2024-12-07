@@ -12,7 +12,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::{util, AppState};
+use crate::{database, util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub struct AuthConfig {
@@ -145,10 +145,11 @@ async fn do_auth(
 ) -> Result<String, (StatusCode, String)> {
     assert!(app.is_tls);
     let db = app.db.lock().await;
-    let account_id = util::check_credentials(&db, &req.username, &req.password).map_err(|e| {
-        warn!("Auth error: {}", e);
-        (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string())
-    })?;
+    let account_id =
+        database::check_credentials(&db, &req.username, &req.password).map_err(|e| {
+            warn!("Auth error: {}", e);
+            (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string())
+        })?;
     match gen_jwt(
         app.config.auth.as_ref().unwrap(),
         account_id,
@@ -182,7 +183,7 @@ async fn do_refresh(
     };
 
     let db = app.db.lock().await;
-    let username = match util::find_account(&db, account_id) {
+    let username = match database::find_account(&db, account_id) {
         Some(a) => a.login,
         None => {
             warn!("Account not found: {} (refresh)", account_id);

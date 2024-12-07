@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use ::ring::rand::SystemRandom;
 use axum::{extract::State, routing::get, Json, Router};
@@ -11,6 +11,7 @@ use tokio::sync::Mutex;
 #[cfg(feature = "tls")]
 use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
 
+mod account;
 mod auth;
 mod cookie;
 mod monitor;
@@ -18,10 +19,12 @@ mod rankinfo;
 mod statics;
 
 mod database;
+mod email;
 mod util;
 
 #[derive(Deserialize, Clone)]
 struct CoreConfig {
+    hostname: String,
     db_path: String,
     port: Option<u16>,
 }
@@ -47,6 +50,7 @@ struct Config {
     game: GameConfig,
     monitor: Option<monitor::MonitorConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,
+    account: Option<account::AccountConfig>,
     auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
 }
@@ -62,6 +66,7 @@ impl Config {
 struct AppState {
     db: Arc<Mutex<Connection>>,
     rng: Arc<SystemRandom>,
+    email_verifications: Arc<Mutex<HashMap<String, email::EmailVerification>>>,
     is_tls: bool,
     config: Config,
 }
@@ -75,6 +80,7 @@ impl AppState {
         Self {
             db: Arc::new(Mutex::new(conn)),
             rng: Arc::new(SystemRandom::new()),
+            email_verifications: Arc::new(Mutex::new(HashMap::new())),
             is_tls: false,
             config: config.clone(),
         }
@@ -112,6 +118,9 @@ async fn main() {
 
     // register HTTPS-only endpoints
     let mut routes_tls = Router::new().merge(routes.clone());
+    if let Some(ref account_config) = config.account {
+        routes_tls = account::register(routes_tls, account_config);
+    }
     if let Some(ref auth_config) = config.auth {
         routes_tls = auth::register(routes_tls, auth_config, &state.rng);
     }

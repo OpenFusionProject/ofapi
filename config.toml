@@ -1,4 +1,5 @@
 [core]
+hostname = "api.example.xyz"
 db_path = "../OpenFusion/database.db"
 port = 8888
 
@@ -22,6 +23,20 @@ monitor_ip = "127.0.0.1:8003"
 [rankinfo]
 route = "/getranks"
 placeholders = true
+
+[account]
+route = "/account"
+
+## Account registration
+register_subroute = "/register"
+account_level = 99
+# If this is true, accounts will not be created until after email verification.
+# Note that all email verification requests expire when the API server is shut off.
+require_email_verification = false
+
+## Email verification
+email_verification_subroute = "/verify"
+email_verification_valid_secs = 3_600 # one hour
 
 [auth]
 route = "/auth"

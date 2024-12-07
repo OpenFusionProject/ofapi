@@ -127,8 +127,6 @@ pub fn create_account(
         VALUES (?, ?, ?, ?);
         ";
 
-    // TODO validate username, password, email
-
     let mut stmt = db.prepare(QUERY).unwrap();
     let email = email.unwrap_or("");
     stmt.bind((1, username)).unwrap();
@@ -154,8 +152,6 @@ pub fn update_email_for_account(
         SET Email = ?
         WHERE Login = ?;
         ";
-
-    // TODO validate username, email
 
     let mut stmt = db.prepare(QUERY).unwrap();
     stmt.bind((1, email)).unwrap();

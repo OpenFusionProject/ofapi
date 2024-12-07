@@ -1,4 +1,5 @@
 use axum::http::HeaderMap;
+use ring::rand::{SecureRandom as _, SystemRandom};
 
 use crate::auth::{self, TokenKind};
 
@@ -50,4 +51,14 @@ pub fn validate_authed_request(headers: &HeaderMap, kind: TokenKind) -> Result<i
     }
     let token = parts[1];
     auth::validate_jwt(token, kind)
+}
+
+pub fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {
+    let mut code_bytes = [0u8; N];
+    rng.fill(&mut code_bytes).unwrap();
+    let mut code = String::new();
+    for byte in code_bytes.iter() {
+        code.push_str(&format!("{:02x}", byte));
+    }
+    code
 }

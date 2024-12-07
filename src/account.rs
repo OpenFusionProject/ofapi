@@ -173,7 +173,7 @@ async fn register_account(
 
     if email_required {
         return (
-            StatusCode::OK,
+            StatusCode::ACCEPTED,
             "Email verification required. Check your email for a verification link.".to_string(),
         );
     }
@@ -194,7 +194,7 @@ async fn register_account(
         );
     }
 
-    (StatusCode::OK, "Account created".to_string())
+    (StatusCode::CREATED, "Account created".to_string())
 }
 
 async fn verify_email(

@@ -3,7 +3,7 @@ use std::sync::{Arc, LazyLock};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use jsonwebtoken::get_current_timestamp;
@@ -77,7 +77,7 @@ pub fn register(routes: Router<Arc<AppState>>, config: &AccountConfig) -> Router
     info!("\tEmail verification route @ {}", email_verification_route);
     routes
         .route(&register_route, post(register_account))
-        .route(&email_verification_route, post(verify_email))
+        .route(&email_verification_route, get(verify_email))
 }
 
 async fn register_account(

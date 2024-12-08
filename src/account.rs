@@ -108,7 +108,7 @@ async fn get_account_info(
     };
     Ok(Json(AccountInfoResponse {
         username: account.login,
-        email: account.email,
+        email: util::mask_email(&account.email),
     }))
 }
 

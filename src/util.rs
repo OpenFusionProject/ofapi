@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use axum::http::HeaderMap;
 use ring::rand::{SecureRandom as _, SystemRandom};
 
@@ -61,4 +63,11 @@ pub fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {
         code.push_str(&format!("{:02x}", byte));
     }
     code
+}
+
+pub fn mask_email(email: &str) -> String {
+    let parts: Vec<&str> = email.split('@').collect();
+    let revealed_len = min(3, parts[0].len());
+    let masked = format!("{}******@{}", &parts[0][..revealed_len], parts[1]);
+    masked
 }

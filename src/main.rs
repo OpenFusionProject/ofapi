@@ -212,7 +212,7 @@ async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
             .config
             .account
             .as_ref()
-            .map_or(false, |a| a.is_email_verification_required()),
+            .map_or(false, |a| a.is_email_required()),
     };
     Json(info)
 }

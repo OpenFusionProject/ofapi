@@ -40,6 +40,7 @@ pub struct AccountConfig {
     // Register
     register_subroute: String,
     account_level: u8,
+    require_email: bool,
     require_email_verification: bool,
     // Verify
     email_verification_subroute: String,
@@ -50,8 +51,8 @@ impl AccountConfig {
         util::get_subroute(&self.route, &self.email_verification_subroute)
     }
 
-    pub fn is_email_verification_required(&self) -> bool {
-        self.require_email_verification
+    pub fn is_email_required(&self) -> bool {
+        self.require_email
     }
 }
 
@@ -85,12 +86,7 @@ async fn register_account(
 ) -> (StatusCode, String) {
     let db = app.db.lock().await;
 
-    let email_required = app
-        .config
-        .account
-        .as_ref()
-        .unwrap()
-        .require_email_verification;
+    let cfg = app.config.account.as_ref().unwrap();
 
     // Validate username, password, and email
     if !USERNAME_REGEX.is_match(&req.username) {
@@ -124,7 +120,7 @@ async fn register_account(
             info!("Email already in use: {}", email);
             return (StatusCode::BAD_REQUEST, "Email already in use".to_string());
         }
-    } else if email_required {
+    } else if cfg.require_email {
         info!("Email required but not provided");
         return (
             StatusCode::BAD_REQUEST,
@@ -146,7 +142,7 @@ async fn register_account(
 
     if let Some(email) = &req.email {
         // Send a verification email
-        let verification_kind = if email_required {
+        let verification_kind = if cfg.require_email_verification {
             EmailVerificationKind::Register {
                 username: req.username.clone(),
                 password_hashed: password_hashed.clone(),
@@ -166,7 +162,7 @@ async fn register_account(
             email::send_verification_email(&app, email, verification_kind, valid_for).await
         {
             warn!("Failed to send email verification: {}", e);
-            if email_required {
+            if cfg.require_email_verification {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Server error".to_string(),
@@ -175,7 +171,7 @@ async fn register_account(
         }
     }
 
-    if email_required {
+    if cfg.require_email_verification {
         return (
             StatusCode::ACCEPTED,
             "Email verification required. Check your email for a verification link.".to_string(),

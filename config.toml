@@ -30,6 +30,7 @@ route = "/account"
 ## Account registration
 register_subroute = "/register"
 account_level = 99
+require_email = false
 # If this is true, accounts will not be created until after email verification.
 # Note that all email verification requests expire when the API server is shut off.
 require_email_verification = false

@@ -199,6 +199,7 @@ pub struct InfoResponse {
     pub secure_apis_enabled: bool,
     pub game_versions: Vec<String>,
     pub login_address: String,
+    pub email_required: bool,
 }
 
 async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
@@ -207,6 +208,11 @@ async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
         secure_apis_enabled: state.is_tls,
         game_versions: state.config.game.versions.clone(),
         login_address: state.config.game.login_address.clone(),
+        email_required: state
+            .config
+            .account
+            .as_ref()
+            .map_or(false, |a| a.is_email_verification_required()),
     };
     Json(info)
 }

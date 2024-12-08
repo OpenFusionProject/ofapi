@@ -49,6 +49,10 @@ impl AccountConfig {
     pub fn get_email_verification_route(&self) -> String {
         util::get_subroute(&self.route, &self.email_verification_subroute)
     }
+
+    pub fn is_email_verification_required(&self) -> bool {
+        self.require_email_verification
+    }
 }
 
 #[derive(Deserialize, Debug)]

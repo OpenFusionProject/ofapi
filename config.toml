@@ -9,6 +9,9 @@ cert_path = "cert.pem" # app-level TLS only
 key_path = "key.pem" # app-level TLS only
 port = 4433
 
+[email]
+template_dir = "./templates"
+
 [game]
 # GUID of the game versions compatible the OpenFusion server.
 # If this identifies any custom versions, you should include the

@@ -2,16 +2,17 @@ use std::sync::{Arc, LazyLock};
 
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
 };
 use jsonwebtoken::get_current_timestamp;
 use log::*;
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
+    auth::TokenKind,
     database,
     email::{self, EmailVerificationKind},
     util, AppState,
@@ -56,6 +57,12 @@ impl AccountConfig {
     }
 }
 
+#[derive(Serialize, Debug)]
+struct AccountInfoResponse {
+    username: String,
+    email: String,
+}
+
 #[derive(Deserialize, Debug)]
 struct RegisterRequest {
     username: String,
@@ -76,14 +83,40 @@ pub fn register(routes: Router<Arc<AppState>>, config: &AccountConfig) -> Router
     let email_verification_route = config.get_email_verification_route();
     info!("\tEmail verification route @ {}", email_verification_route);
     routes
+        .route(route, get(get_account_info))
         .route(&register_route, post(register_account))
         .route(&email_verification_route, get(verify_email))
+}
+
+async fn get_account_info(
+    State(app): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<AccountInfoResponse>, (StatusCode, String)> {
+    assert!(app.is_tls);
+    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
+        Ok(id) => id,
+        Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+    };
+    let db = app.db.lock().await;
+    let Some(account) = database::find_account(&db, account_id) else {
+        // account should definitely exist
+        error!("Account for authed user not found: {}", account_id);
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        ));
+    };
+    Ok(Json(AccountInfoResponse {
+        username: account.login,
+        email: account.email,
+    }))
 }
 
 async fn register_account(
     State(app): State<Arc<AppState>>,
     Json(req): Json<RegisterRequest>,
 ) -> (StatusCode, String) {
+    assert!(app.is_tls);
     let db = app.db.lock().await;
 
     let cfg = app.config.account.as_ref().unwrap();

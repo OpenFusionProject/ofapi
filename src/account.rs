@@ -159,7 +159,8 @@ async fn register_account(
             .unwrap()
             .email_verification_valid_secs;
         if let Err(e) =
-            email::send_verification_email(&app, email, verification_kind, valid_for).await
+            email::send_verification_email(&app, &req.username, email, verification_kind, valid_for)
+                .await
         {
             warn!("Failed to send email verification: {}", e);
             if cfg.require_email_verification {

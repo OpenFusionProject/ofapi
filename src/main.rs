@@ -48,6 +48,7 @@ struct GameConfig {
 struct Config {
     core: CoreConfig,
     tls: Option<TlsConfig>,
+    email: Option<email::EmailConfig>,
     game: GameConfig,
     monitor: Option<monitor::MonitorConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,

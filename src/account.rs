@@ -46,10 +46,16 @@ pub struct AccountConfig {
     // Verify
     email_verification_subroute: String,
     email_verification_valid_secs: u64,
+    // Update
+    update_email_subroute: String,
 }
 impl AccountConfig {
     pub fn get_email_verification_route(&self) -> String {
         util::get_subroute(&self.route, &self.email_verification_subroute)
+    }
+
+    pub fn get_update_email_route(&self) -> String {
+        util::get_subroute(&self.route, &self.update_email_subroute)
     }
 
     pub fn is_email_required(&self) -> bool {
@@ -75,6 +81,12 @@ struct EmailVerificationRequest {
     code: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct UpdateEmailRequest {
+    password: String,
+    new_email: String,
+}
+
 pub fn register(routes: Router<Arc<AppState>>, config: &AccountConfig) -> Router<Arc<AppState>> {
     let route = &config.route;
     info!("Registering account route @ {}", route);
@@ -82,10 +94,13 @@ pub fn register(routes: Router<Arc<AppState>>, config: &AccountConfig) -> Router
     info!("\tRegister route @ {}", register_route);
     let email_verification_route = config.get_email_verification_route();
     info!("\tEmail verification route @ {}", email_verification_route);
+    let email_update_route = config.get_update_email_route();
+    info!("\tEmail update route @ {}", email_update_route);
     routes
         .route(route, get(get_account_info))
         .route(&register_route, post(register_account))
         .route(&email_verification_route, get(verify_email))
+        .route(&email_update_route, post(update_email))
 }
 
 async fn get_account_info(
@@ -295,4 +310,48 @@ async fn verify_email(
     }
 
     (StatusCode::OK, "Email verified".to_string())
+}
+
+async fn update_email(
+    State(app): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<UpdateEmailRequest>,
+) -> (StatusCode, String) {
+    assert!(app.is_tls);
+    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
+        Ok(id) => id,
+        Err(e) => return (StatusCode::UNAUTHORIZED, e),
+    };
+
+    let db = app.db.lock().await;
+    let Ok(username) = database::check_password(&db, account_id, &req.password) else {
+        return (StatusCode::UNAUTHORIZED, "Invalid password".to_string());
+    };
+
+    if !EMAIL_REGEX.is_match(&req.new_email) {
+        return (StatusCode::BAD_REQUEST, "Invalid email".to_string());
+    }
+
+    let cfg = app.config.account.as_ref().unwrap();
+    let verification_kind = EmailVerificationKind::Verify {
+        username: username.clone(),
+    };
+    let valid_for = cfg.email_verification_valid_secs;
+    if let Err(e) = email::send_verification_email(
+        &app,
+        &username,
+        &req.new_email,
+        verification_kind,
+        valid_for,
+    )
+    .await
+    {
+        warn!("Failed to send email verification: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        );
+    }
+
+    (StatusCode::ACCEPTED, "Verification email sent".to_string())
 }

@@ -172,3 +172,25 @@ pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Res
         Err(e) => Err(format!("bcrypt error: {}", e)),
     }
 }
+
+pub fn check_password(db: &Connection, account_id: i64, password: &str) -> Result<String, String> {
+    const QUERY: &str = "
+        SELECT Login, Password
+        FROM Accounts
+        WHERE AccountID = ?
+        LIMIT 1;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, account_id)).unwrap();
+    if let Ok(State::Row) = stmt.next() {
+        let username: String = stmt.read(0).unwrap();
+        let password_hashed: String = stmt.read(1).unwrap();
+        match bcrypt::verify(password, &password_hashed) {
+            Ok(true) => Ok(username),
+            Ok(false) => Err("Invalid password".to_string()),
+            Err(e) => Err(format!("bcrypt error: {}", e)),
+        }
+    } else {
+        Err("Account not found".to_string())
+    }
+}

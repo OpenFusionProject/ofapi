@@ -45,6 +45,9 @@ require_email_verification = false
 email_verification_subroute = "/verify"
 email_verification_valid_secs = 3_600 # one hour
 
+## Update account info
+update_email_subroute = "/update/email"
+
 [auth]
 route = "/auth"
 refresh_subroute = "/session"

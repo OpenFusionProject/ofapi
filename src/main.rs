@@ -24,7 +24,7 @@ mod util;
 
 #[derive(Deserialize, Clone)]
 struct CoreConfig {
-    hostname: String,
+    public_url: String,
     db_path: String,
     port: Option<u16>,
 }

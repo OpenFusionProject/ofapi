@@ -1,5 +1,5 @@
 [core]
-hostname = "api.example.xyz"
+public_url = "api.example.xyz"
 db_path = "../OpenFusion/database.db"
 port = 8888
 

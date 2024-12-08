@@ -48,8 +48,8 @@ pub async fn send_verification_email(
     };
     let verification_route = account_config.get_email_verification_route();
     let verification_link = format!(
-        "{}{}?code={}",
-        app.config.core.hostname, verification_route, code
+        "https://{}{}?code={}",
+        app.config.core.public_url, verification_route, code
     );
     dbg!(&verification_link);
 

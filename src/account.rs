@@ -48,6 +48,7 @@ pub struct AccountConfig {
     email_verification_valid_secs: u64,
     // Update
     update_email_subroute: String,
+    update_password_subroute: String,
 }
 impl AccountConfig {
     pub fn get_email_verification_route(&self) -> String {
@@ -56,6 +57,10 @@ impl AccountConfig {
 
     pub fn get_update_email_route(&self) -> String {
         util::get_subroute(&self.route, &self.update_email_subroute)
+    }
+
+    pub fn get_update_password_route(&self) -> String {
+        util::get_subroute(&self.route, &self.update_password_subroute)
     }
 
     pub fn is_email_required(&self) -> bool {
@@ -82,6 +87,12 @@ struct EmailVerificationRequest {
 }
 
 #[derive(Deserialize, Debug)]
+struct UpdatePasswordRequest {
+    password: String,
+    new_password: String,
+}
+
+#[derive(Deserialize, Debug)]
 struct UpdateEmailRequest {
     password: String,
     new_email: String,
@@ -94,12 +105,15 @@ pub fn register(routes: Router<Arc<AppState>>, config: &AccountConfig) -> Router
     info!("\tRegister route @ {}", register_route);
     let email_verification_route = config.get_email_verification_route();
     info!("\tEmail verification route @ {}", email_verification_route);
+    let password_update_route = config.get_update_password_route();
+    info!("\tPassword update route @ {}", password_update_route);
     let email_update_route = config.get_update_email_route();
     info!("\tEmail update route @ {}", email_update_route);
     routes
         .route(route, get(get_account_info))
         .route(&register_route, post(register_account))
         .route(&email_verification_route, get(verify_email))
+        .route(&password_update_route, post(update_password))
         .route(&email_update_route, post(update_email))
 }
 
@@ -312,6 +326,48 @@ async fn verify_email(
     (StatusCode::OK, "Email verified".to_string())
 }
 
+async fn update_password(
+    State(app): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<UpdatePasswordRequest>,
+) -> (StatusCode, String) {
+    assert!(app.is_tls);
+    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
+        Ok(id) => id,
+        Err(e) => return (StatusCode::UNAUTHORIZED, e),
+    };
+
+    let db = app.db.lock().await;
+    let Ok(username) = database::check_password(&db, account_id, &req.password) else {
+        return (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string());
+    };
+
+    if !PASSWORD_REGEX.is_match(&req.new_password) {
+        return (StatusCode::BAD_REQUEST, "Invalid new password".to_string());
+    }
+
+    let new_password_hashed = match bcrypt::hash(&req.new_password, bcrypt::DEFAULT_COST) {
+        Ok(hash) => hash,
+        Err(e) => {
+            error!("bcrypt error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            );
+        }
+    };
+
+    if let Err(e) = database::update_password_for_account(&db, &username, &new_password_hashed) {
+        error!("Failed to update password: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        );
+    }
+
+    (StatusCode::OK, "Password updated".to_string())
+}
+
 async fn update_email(
     State(app): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -325,7 +381,7 @@ async fn update_email(
 
     let db = app.db.lock().await;
     let Ok(username) = database::check_password(&db, account_id, &req.password) else {
-        return (StatusCode::UNAUTHORIZED, "Invalid password".to_string());
+        return (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string());
     };
 
     if !EMAIL_REGEX.is_match(&req.new_email) {

@@ -142,6 +142,28 @@ pub fn create_account(
     Ok(account.id)
 }
 
+pub fn update_password_for_account(
+    db: &Connection,
+    username: &str,
+    password_hashed: &str,
+) -> Result<(), String> {
+    const QUERY: &str = "
+        UPDATE Accounts
+        SET Password = ?
+        WHERE Login = ?;
+        ";
+
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, password_hashed)).unwrap();
+    stmt.bind((2, username)).unwrap();
+    if let Err(e) = stmt.next() {
+        return Err(format!("Failed to update password: {}", e));
+    }
+
+    info!("Updated password for account: {}", username);
+    Ok(())
+}
+
 pub fn update_email_for_account(
     db: &Connection,
     username: &str,

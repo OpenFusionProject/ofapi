@@ -47,6 +47,7 @@ email_verification_valid_secs = 3_600 # one hour
 
 ## Update account info
 update_email_subroute = "/update/email"
+update_password_subroute = "/update/password"
 
 [auth]
 route = "/auth"

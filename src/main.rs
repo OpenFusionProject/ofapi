@@ -24,6 +24,7 @@ mod util;
 
 #[derive(Deserialize, Clone)]
 struct CoreConfig {
+    server_name: String,
     public_url: String,
     db_path: String,
     port: Option<u16>,
@@ -195,6 +196,7 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
 
 #[derive(Serialize, Deserialize)]
 pub struct InfoResponse {
+    pub server_name: String,
     pub api_version: String,
     pub secure_apis_enabled: bool,
     pub game_versions: Vec<String>,
@@ -204,6 +206,7 @@ pub struct InfoResponse {
 
 async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
     let info = InfoResponse {
+        server_name: state.config.core.server_name.clone(),
         api_version: env!("CARGO_PKG_VERSION").to_string(),
         secure_apis_enabled: state.is_tls,
         game_versions: state.config.game.versions.clone(),

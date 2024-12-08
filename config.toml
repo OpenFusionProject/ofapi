@@ -1,4 +1,5 @@
 [core]
+server_name = "My OpenFusion Server"
 public_url = "api.example.xyz"
 db_path = "../OpenFusion/database.db"
 port = 8888

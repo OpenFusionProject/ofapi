@@ -42,7 +42,7 @@ struct TlsConfig {
 struct GameConfig {
     versions: Vec<String>,
     login_address: String,
-    custom_loading_screen: bool,
+    custom_loading_screen: Option<bool>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -219,7 +219,7 @@ async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
             .account
             .as_ref()
             .map_or(false, |a| a.is_email_required()),
-        custom_loading_screen: state.config.game.custom_loading_screen,
+        custom_loading_screen: state.config.game.custom_loading_screen.unwrap_or(false),
     };
     Json(info)
 }

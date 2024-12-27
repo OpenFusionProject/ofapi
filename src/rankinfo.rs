@@ -14,12 +14,15 @@ use sqlite::Connection;
 use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
-pub struct RankInfoConfig {
+pub(crate) struct RankInfoConfig {
     route: String,
     placeholders: bool,
 }
 
-pub fn register(routes: Router<Arc<AppState>>, config: &RankInfoConfig) -> Router<Arc<AppState>> {
+pub(crate) fn register(
+    routes: Router<Arc<AppState>>,
+    config: &RankInfoConfig,
+) -> Router<Arc<AppState>> {
     let route = &config.route;
     info!("Registering rankinfo route @ {}", route);
     routes.route(route, post(get_ranks))

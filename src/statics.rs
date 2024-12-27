@@ -6,7 +6,7 @@ use tower_http::services::{ServeDir, ServeFile};
 
 use crate::{util, AppState};
 
-pub fn register(mut routes: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
+pub(crate) fn register(mut routes: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     const MAPPINGS_PATH: &str = "statics.csv";
 
     info!("Registering static routes");

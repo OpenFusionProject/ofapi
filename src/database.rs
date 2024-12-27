@@ -5,14 +5,14 @@ const MIN_DATABASE_VERSION: i64 = 6;
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct Account {
+pub(crate) struct Account {
     id: i64,
-    pub login: String,
-    pub password_hashed: String,
-    pub email: String,
+    pub(crate) login: String,
+    pub(crate) password_hashed: String,
+    pub(crate) email: String,
 }
 
-pub fn connect_to_db(path: &str) -> Connection {
+pub(crate) fn connect_to_db(path: &str) -> Connection {
     const QUERY: &str = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Meta';";
     const VERSION_QUERY: &str = "SELECT Value FROM Meta WHERE Key = 'DatabaseVersion';";
 
@@ -52,7 +52,7 @@ pub fn connect_to_db(path: &str) -> Connection {
     conn
 }
 
-pub fn find_account(db: &Connection, account_id: i64) -> Option<Account> {
+pub(crate) fn find_account(db: &Connection, account_id: i64) -> Option<Account> {
     const QUERY: &str = "
         SELECT AccountID, Login, Password, Email
         FROM Accounts
@@ -73,7 +73,7 @@ pub fn find_account(db: &Connection, account_id: i64) -> Option<Account> {
     }
 }
 
-pub fn find_account_by_username(db: &Connection, username: &str) -> Option<Account> {
+pub(crate) fn find_account_by_username(db: &Connection, username: &str) -> Option<Account> {
     const QUERY: &str = "
         SELECT AccountID, Login, Password, Email
         FROM Accounts
@@ -94,7 +94,7 @@ pub fn find_account_by_username(db: &Connection, username: &str) -> Option<Accou
     }
 }
 
-pub fn find_account_by_email(db: &Connection, email: &str) -> Option<Account> {
+pub(crate) fn find_account_by_email(db: &Connection, email: &str) -> Option<Account> {
     const QUERY: &str = "
         SELECT AccountID, Login, Password, Email
         FROM Accounts
@@ -115,7 +115,7 @@ pub fn find_account_by_email(db: &Connection, email: &str) -> Option<Account> {
     }
 }
 
-pub fn create_account(
+pub(crate) fn create_account(
     db: &Connection,
     username: &str,
     password_hashed: &str,
@@ -142,7 +142,7 @@ pub fn create_account(
     Ok(account.id)
 }
 
-pub fn update_password_for_account(
+pub(crate) fn update_password_for_account(
     db: &Connection,
     username: &str,
     password_hashed: &str,
@@ -164,7 +164,7 @@ pub fn update_password_for_account(
     Ok(())
 }
 
-pub fn update_email_for_account(
+pub(crate) fn update_email_for_account(
     db: &Connection,
     username: &str,
     email: &str,
@@ -186,7 +186,11 @@ pub fn update_email_for_account(
     Ok(())
 }
 
-pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Result<i64, String> {
+pub(crate) fn check_credentials(
+    db: &Connection,
+    username: &str,
+    password: &str,
+) -> Result<i64, String> {
     let account = find_account_by_username(db, username).ok_or("Account not found")?;
     match bcrypt::verify(password, &account.password_hashed) {
         Ok(true) => Ok(account.id),
@@ -195,7 +199,11 @@ pub fn check_credentials(db: &Connection, username: &str, password: &str) -> Res
     }
 }
 
-pub fn check_password(db: &Connection, account_id: i64, password: &str) -> Result<String, String> {
+pub(crate) fn check_password(
+    db: &Connection,
+    account_id: i64,
+    password: &str,
+) -> Result<String, String> {
     const QUERY: &str = "
         SELECT Login, Password
         FROM Accounts

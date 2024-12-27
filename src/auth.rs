@@ -15,7 +15,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::{database, util, AppState};
 
 #[derive(Deserialize, Clone)]
-pub struct AuthConfig {
+pub(crate) struct AuthConfig {
     route: String,
     refresh_subroute: String,
     secret_path: String,
@@ -24,20 +24,20 @@ pub struct AuthConfig {
 }
 
 #[derive(Deserialize)]
-pub struct AuthRequest {
+pub(crate) struct AuthRequest {
     username: String,
     password: String,
 }
 
 #[repr(u8)]
 #[derive(Deserialize_repr, Serialize_repr, PartialEq, Eq)]
-pub enum TokenKind {
+pub(crate) enum TokenKind {
     Refresh = 0,
     Session = 1,
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct Claims {
+pub(crate) struct Claims {
     sub: String,     // account id as a string
     crt: u64,        // creation timestamp in UTC
     exp: u64,        // expiration timestamp in UTC
@@ -65,7 +65,7 @@ fn check_secret(path: &str, rng: &SystemRandom) {
     SECRET_KEY.set(secret).unwrap();
 }
 
-pub fn register(
+pub(crate) fn register(
     routes: Router<Arc<AppState>>,
     config: &AuthConfig,
     rng: &SystemRandom,
@@ -112,7 +112,7 @@ fn get_validator(account_id: Option<i64>) -> Validation {
     validation
 }
 
-pub fn validate_jwt(jwt: &str, kind: TokenKind) -> Result<i64, String> {
+pub(crate) fn validate_jwt(jwt: &str, kind: TokenKind) -> Result<i64, String> {
     let Some(secret) = SECRET_KEY.get() else {
         return Err("Auth module not initialized".to_string());
     };
@@ -167,7 +167,7 @@ async fn do_auth(
 }
 
 #[derive(Debug, Serialize)]
-pub struct RefreshResponse {
+pub(crate) struct RefreshResponse {
     username: String,
     session_token: String,
 }

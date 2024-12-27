@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
-pub struct EmailConfig {
+pub(crate) struct EmailConfig {
     template_dir: String,
 }
 
@@ -28,13 +28,13 @@ fn gen_email_content_from_template(
 }
 
 #[derive(Debug, Clone)]
-pub struct EmailVerification {
-    pub email: String,
-    pub expires: u64,
-    pub kind: EmailVerificationKind,
+pub(crate) struct EmailVerification {
+    pub(crate) email: String,
+    pub(crate) expires: u64,
+    pub(crate) kind: EmailVerificationKind,
 }
 impl EmailVerification {
-    pub fn new(email: &str, kind: EmailVerificationKind, valid_for: u64) -> Self {
+    pub(crate) fn new(email: &str, kind: EmailVerificationKind, valid_for: u64) -> Self {
         Self {
             email: email.to_string(),
             kind,
@@ -44,7 +44,7 @@ impl EmailVerification {
 }
 
 #[derive(Debug, Clone)]
-pub enum EmailVerificationKind {
+pub(crate) enum EmailVerificationKind {
     Register {
         username: String,
         password_hashed: String,
@@ -54,7 +54,7 @@ pub enum EmailVerificationKind {
     },
 }
 
-pub async fn send_verification_email(
+pub(crate) async fn send_verification_email(
     app: &AppState,
     username: &str,
     email: &str,

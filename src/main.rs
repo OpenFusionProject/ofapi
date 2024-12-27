@@ -197,14 +197,14 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct InfoResponse {
-    pub server_name: String,
-    pub api_version: String,
-    pub secure_apis_enabled: bool,
-    pub game_versions: Vec<String>,
-    pub login_address: String,
-    pub email_required: bool,
-    pub custom_loading_screen: bool,
+struct InfoResponse {
+    server_name: String,
+    api_version: String,
+    secure_apis_enabled: bool,
+    game_versions: Vec<String>,
+    login_address: String,
+    email_required: bool,
+    custom_loading_screen: bool,
 }
 
 async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {

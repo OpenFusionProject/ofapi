@@ -16,19 +16,22 @@ use sqlite::Connection;
 use crate::{auth::TokenKind, database, util, AppState};
 
 #[derive(Deserialize, Clone)]
-pub struct CookieConfig {
+pub(crate) struct CookieConfig {
     route: String,
     valid_secs: u64,
 }
 
 #[derive(Serialize)]
-pub struct CookieResponse {
+pub(crate) struct CookieResponse {
     username: String,
     cookie: String,
     expires: u64,
 }
 
-pub fn register(routes: Router<Arc<AppState>>, config: &CookieConfig) -> Router<Arc<AppState>> {
+pub(crate) fn register(
+    routes: Router<Arc<AppState>>,
+    config: &CookieConfig,
+) -> Router<Arc<AppState>> {
     let route = &config.route;
     info!("Registering cookie route @ {}", route);
     routes.route(route, post(get_cookie))

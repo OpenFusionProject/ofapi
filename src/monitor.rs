@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::AppState;
 
 #[derive(Deserialize, Clone)]
-pub struct MonitorConfig {
+pub(crate) struct MonitorConfig {
     route: String,
     monitor_ip: String,
 }
@@ -28,7 +28,10 @@ fn monitor_callback(notification: MonitorNotification) {
     }
 }
 
-pub fn register(routes: Router<Arc<AppState>>, config: &MonitorConfig) -> Router<Arc<AppState>> {
+pub(crate) fn register(
+    routes: Router<Arc<AppState>>,
+    config: &MonitorConfig,
+) -> Router<Arc<AppState>> {
     let route = &config.route;
     let addr = &config.monitor_ip;
     STATUS

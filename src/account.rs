@@ -36,7 +36,7 @@ const EMAIL_REGEX_SPEC: &str = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}
 static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(EMAIL_REGEX_SPEC).unwrap());
 
 #[derive(Deserialize, Clone)]
-pub struct AccountConfig {
+pub(crate) struct AccountConfig {
     route: String,
     // Register
     register_subroute: String,
@@ -51,19 +51,19 @@ pub struct AccountConfig {
     update_password_subroute: String,
 }
 impl AccountConfig {
-    pub fn get_email_verification_route(&self) -> String {
+    pub(crate) fn get_email_verification_route(&self) -> String {
         util::get_subroute(&self.route, &self.email_verification_subroute)
     }
 
-    pub fn get_update_email_route(&self) -> String {
+    pub(crate) fn get_update_email_route(&self) -> String {
         util::get_subroute(&self.route, &self.update_email_subroute)
     }
 
-    pub fn get_update_password_route(&self) -> String {
+    pub(crate) fn get_update_password_route(&self) -> String {
         util::get_subroute(&self.route, &self.update_password_subroute)
     }
 
-    pub fn is_email_required(&self) -> bool {
+    pub(crate) fn is_email_required(&self) -> bool {
         self.require_email
     }
 }
@@ -98,7 +98,10 @@ struct UpdateEmailRequest {
     new_email: String,
 }
 
-pub fn register(routes: Router<Arc<AppState>>, config: &AccountConfig) -> Router<Arc<AppState>> {
+pub(crate) fn register(
+    routes: Router<Arc<AppState>>,
+    config: &AccountConfig,
+) -> Router<Arc<AppState>> {
     let route = &config.route;
     info!("Registering account route @ {}", route);
     let register_route = util::get_subroute(route, &config.register_subroute);

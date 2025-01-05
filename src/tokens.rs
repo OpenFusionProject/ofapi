@@ -34,7 +34,7 @@ impl TokenCapabilities {
 
     pub fn with(self, capability: TokenCapability) -> Self {
         Self {
-            capabilities: self.capabilities | (1 << capability as u64),
+            capabilities: self.capabilities | (capability as u64),
         }
     }
 

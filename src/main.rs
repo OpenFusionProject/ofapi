@@ -16,6 +16,7 @@ pub use ofapi::util;
 mod account;
 mod auth;
 mod cookie;
+mod moderation;
 mod monitor;
 mod rankinfo;
 mod statics;
@@ -53,6 +54,7 @@ struct Config {
     email: Option<email::EmailConfig>,
     game: GameConfig,
     monitor: Option<monitor::MonitorConfig>,
+    moderation: Option<moderation::ModerationConfig>,
     rankinfo: Option<rankinfo::RankInfoConfig>,
     account: Option<account::AccountConfig>,
     auth: Option<auth::AuthConfig>,
@@ -130,6 +132,9 @@ async fn main() {
     }
     if let Some(ref cookie_config) = config.cookie {
         routes_tls = cookie::register(routes_tls, cookie_config);
+    }
+    if let Some(ref moderation_config) = config.moderation {
+        routes_tls = moderation::register(routes_tls, moderation_config);
     }
 
     // init both protocols

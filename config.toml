@@ -26,6 +26,9 @@ custom_loading_screen = false
 route = "/status"
 monitor_ip = "127.0.0.1:8003"
 
+[moderation]
+namereq_route = "/namereq"
+
 [rankinfo]
 route = "/getranks"
 placeholders = true

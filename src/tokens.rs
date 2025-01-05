@@ -41,6 +41,14 @@ impl TokenCapabilities {
     pub fn check(&self, capability: TokenCapability) -> bool {
         (self.capabilities & (1 << capability as u64)) != 0
     }
+
+    pub fn from_vec(capabilities: Vec<TokenCapability>) -> Self {
+        let mut caps = Self::new();
+        for cap in capabilities {
+            caps = caps.with(cap);
+        }
+        caps
+    }
 }
 impl Default for TokenCapabilities {
     fn default() -> Self {

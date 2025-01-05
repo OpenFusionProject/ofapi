@@ -6,8 +6,8 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey, Validation};
 use log::{info, warn};
+use ofapi::tokens::{self, TokenCapabilities, TokenCapability, TokenLifetime};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
@@ -28,59 +28,7 @@ pub(crate) struct AuthRequest {
     password: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum TokenLifetime {
-    ShortTerm,   // e.g. session tokens
-    LongTerm,    // e.g. refresh tokens
-    Permanent,   // e.g. API keys (use with caution)
-    Custom(u64), // duration in secs
-}
-
-#[repr(u64)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TokenCapability {
-    // lower privileges
-    Refresh = (1 << 0),
-    ManageOwnAccount = (1 << 1),
-    GetCookie = (1 << 2),
-    // higher privileges (dangerous)
-    ApproveNames = (1 << 20),
-    // highest privileges (very dangerous)
-    ManageAllAccounts = (1 << 40),
-}
-
-pub(crate) struct TokenCapabilities {
-    capabilities: u64,
-}
-impl TokenCapabilities {
-    pub(crate) fn new() -> Self {
-        Self { capabilities: 0 }
-    }
-
-    pub(crate) fn load(capabilities: u64) -> Self {
-        Self { capabilities }
-    }
-
-    pub(crate) fn with(self, capability: TokenCapability) -> Self {
-        Self {
-            capabilities: self.capabilities | (1 << capability as u64),
-        }
-    }
-
-    pub(crate) fn check(&self, capability: TokenCapability) -> bool {
-        (self.capabilities & (1 << capability as u64)) != 0
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-pub(crate) struct Claims {
-    sub: String, // account id as a string
-    crt: u64,    // creation timestamp in UTC
-    exp: u64,    // expiration timestamp in UTC
-    caps: u64,   // token capabilities
-}
-
-static SECRET_KEY: OnceLock<Vec<u8>> = OnceLock::new();
+pub(crate) static SECRET_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 
 fn check_secret(path: &str, rng: &SystemRandom) {
     const SECRET_LENGTH: usize = 32;
@@ -116,90 +64,26 @@ pub(crate) fn register(
         .route(&refresh_route, post(do_refresh))
 }
 
-fn gen_jwt(
-    auth_config: &AuthConfig,
-    subject: String,
-    caps: TokenCapabilities,
-    lifetime: TokenLifetime,
-) -> Result<String, String> {
-    let secret = SECRET_KEY.get().unwrap();
-    let key = EncodingKey::from_secret(secret);
-
-    let crt = get_current_timestamp();
-    let exp = match lifetime {
-        TokenLifetime::ShortTerm => crt + auth_config.valid_secs_session,
-        TokenLifetime::LongTerm => crt + auth_config.valid_secs_refresh,
-        TokenLifetime::Permanent => u64::MAX,
-        TokenLifetime::Custom(duration_secs) => crt + duration_secs,
-    };
-
-    let claims = Claims {
-        sub: subject,
-        crt,
-        exp,
-        caps: caps.capabilities,
-    };
-
-    jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &key)
-        .map_err(|e| format!("JWT error: {}", e))
-}
-
-fn get_validator(account_id: Option<i64>) -> Validation {
-    let mut validation = Validation::default();
-    // required claims
-    validation.required_spec_claims.insert("sub".to_string());
-    validation.required_spec_claims.insert("exp".to_string());
-    // ensure account ID matches if passed in
-    validation.sub = account_id.map(|id| id.to_string());
-    validation
-}
-
-pub(crate) fn validate_jwt(jwt: &str, caps: Vec<TokenCapability>) -> Result<i64, String> {
-    let Some(secret) = SECRET_KEY.get() else {
-        return Err("Auth module not initialized".to_string());
-    };
-
-    let key = DecodingKey::from_secret(secret);
-    let validation = get_validator(None);
-    let Ok(token) = jsonwebtoken::decode::<Claims>(jwt, &key, &validation) else {
-        return Err("Bad JWT".to_string());
-    };
-
-    // I don't 100% trust this crate to validate the expiration timestamp, so do it manually
-    let now = get_current_timestamp();
-    if token.claims.exp < now {
-        return Err("Expired JWT".to_string());
-    }
-
-    let token_caps = TokenCapabilities::load(token.claims.caps);
-    for cap in &caps {
-        if !token_caps.check(*cap) {
-            return Err(format!("Missing capability: {:?}", cap));
-        }
-    }
-
-    match token.claims.sub.parse() {
-        Ok(id) => Ok(id),
-        Err(e) => Err(format!("Bad account ID: {}", e)),
-    }
-}
-
 async fn do_auth(
     State(app): State<Arc<AppState>>,
     Json(req): Json<AuthRequest>,
 ) -> Result<String, (StatusCode, String)> {
     assert!(app.is_tls);
+
+    let key = SECRET_KEY.get().unwrap();
+    let valid_secs = app.config.auth.as_ref().unwrap().valid_secs_refresh;
+
     let db = app.db.lock().await;
     let account_id =
         database::check_credentials(&db, &req.username, &req.password).map_err(|e| {
             warn!("Auth error: {}", e);
             (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string())
         })?;
-    match gen_jwt(
-        app.config.auth.as_ref().unwrap(),
+    match tokens::gen_jwt(
+        key,
         account_id.to_string(),
         TokenCapabilities::new().with(TokenCapability::Refresh),
-        TokenLifetime::LongTerm,
+        TokenLifetime::Temporary(valid_secs),
     ) {
         Ok(jwt) => Ok(jwt),
         Err(e) => {
@@ -223,10 +107,14 @@ async fn do_refresh(
     headers: HeaderMap,
 ) -> Result<Json<RefreshResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, vec![TokenCapability::Refresh]) {
-        Ok(id) => id,
-        Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
-    };
+
+    let key = SECRET_KEY.get().unwrap();
+
+    let account_id =
+        match util::validate_authed_request(key, &headers, vec![TokenCapability::Refresh]) {
+            Ok(id) => id,
+            Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+        };
 
     let db = app.db.lock().await;
     let username = match database::find_account(&db, account_id) {
@@ -245,11 +133,13 @@ async fn do_refresh(
         .with(TokenCapability::ManageOwnAccount)
         .with(TokenCapability::GetCookie);
 
-    match gen_jwt(
-        app.config.auth.as_ref().unwrap(),
+    let valid_secs = app.config.auth.as_ref().unwrap().valid_secs_session;
+
+    match tokens::gen_jwt(
+        key,
         account_id.to_string(),
         caps,
-        TokenLifetime::ShortTerm,
+        TokenLifetime::Temporary(valid_secs),
     ) {
         Ok(jwt) => Ok(Json(RefreshResponse {
             username,

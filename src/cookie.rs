@@ -9,11 +9,12 @@ use axum::{
 use base64::{prelude::BASE64_STANDARD, Engine};
 use jsonwebtoken::get_current_timestamp;
 use log::*;
+use ofapi::tokens::TokenCapability;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sqlite::Connection;
 
-use crate::{auth::TokenCapability, database, util, AppState};
+use crate::{auth, database, util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct CookieConfig {
@@ -71,11 +72,21 @@ async fn get_cookie(
     headers: HeaderMap,
 ) -> Result<Json<CookieResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, vec![TokenCapability::GetCookie])
-    {
-        Ok(id) => id,
-        Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+
+    // since we aren't in the auth module, the secret key is not guaranteed to be set
+    let Some(key) = auth::SECRET_KEY.get() else {
+        warn!("Cookie route used, but auth module not initialized");
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        ));
     };
+
+    let account_id =
+        match util::validate_authed_request(key, &headers, vec![TokenCapability::GetCookie]) {
+            Ok(id) => id,
+            Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+        };
 
     let cookie = gen_cookie(&app.rng);
     let valid_secs = app.config.cookie.as_ref().unwrap().valid_secs;

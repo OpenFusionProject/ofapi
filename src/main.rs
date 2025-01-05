@@ -11,6 +11,8 @@ use tokio::sync::Mutex;
 #[cfg(feature = "tls")]
 use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
 
+pub use ofapi::util;
+
 mod account;
 mod auth;
 mod cookie;
@@ -20,7 +22,6 @@ mod statics;
 
 mod database;
 mod email;
-mod util;
 
 #[derive(Deserialize, Clone)]
 struct CoreConfig {

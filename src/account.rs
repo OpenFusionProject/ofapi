@@ -8,12 +8,12 @@ use axum::{
 };
 use jsonwebtoken::get_current_timestamp;
 use log::*;
+use ofapi::tokens::TokenCapability;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    auth::TokenCapability,
-    database,
+    auth, database,
     email::{self, EmailVerificationKind},
     util, AppState,
 };
@@ -125,11 +125,21 @@ async fn get_account_info(
     headers: HeaderMap,
 ) -> Result<Json<AccountInfoResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
+    let Some(key) = auth::SECRET_KEY.get() else {
+        warn!("Account route used, but auth module not initialized");
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        ));
+    };
+
     let account_id =
-        match util::validate_authed_request(&headers, vec![TokenCapability::ManageOwnAccount]) {
+        match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
+        {
             Ok(id) => id,
             Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
         };
+
     let db = app.db.lock().await;
     let Some(account) = database::find_account(&db, account_id) else {
         // account should definitely exist
@@ -336,8 +346,17 @@ async fn update_password(
     Json(req): Json<UpdatePasswordRequest>,
 ) -> (StatusCode, String) {
     assert!(app.is_tls);
+    let Some(key) = auth::SECRET_KEY.get() else {
+        warn!("Account route used, but auth module not initialized");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        );
+    };
+
     let account_id =
-        match util::validate_authed_request(&headers, vec![TokenCapability::ManageOwnAccount]) {
+        match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
+        {
             Ok(id) => id,
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };
@@ -379,8 +398,17 @@ async fn update_email(
     Json(req): Json<UpdateEmailRequest>,
 ) -> (StatusCode, String) {
     assert!(app.is_tls);
+    let Some(key) = auth::SECRET_KEY.get() else {
+        warn!("Account route used, but auth module not initialized");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        );
+    };
+
     let account_id =
-        match util::validate_authed_request(&headers, vec![TokenCapability::ManageOwnAccount]) {
+        match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
+        {
             Ok(id) => id,
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };

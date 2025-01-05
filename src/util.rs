@@ -3,9 +3,9 @@ use std::cmp::min;
 use axum::http::HeaderMap;
 use ring::rand::{SecureRandom as _, SystemRandom};
 
-use crate::auth::{self, TokenCapability};
+use crate::tokens::{self, TokenCapability};
 
-pub(crate) fn version_to_string(version: usize) -> String {
+pub fn version_to_string(version: usize) -> String {
     // ex: 3045003 -> "3.45.3"
     let major = version / 1000000;
     let minor = (version % 1000000) / 1000;
@@ -13,13 +13,13 @@ pub(crate) fn version_to_string(version: usize) -> String {
     format!("{}.{}.{}", major, minor, patch)
 }
 
-pub(crate) fn get_subroute(route: &str, subroute: &str) -> String {
+pub fn get_subroute(route: &str, subroute: &str) -> String {
     let route_noslash = route.trim_end_matches('/');
     let subroute_noslash = subroute.trim_start_matches('/');
     format!("{}/{}", route_noslash, subroute_noslash)
 }
 
-pub(crate) fn wrap_xml(name: &str, content: &str, newlines: bool) -> String {
+pub fn wrap_xml(name: &str, content: &str, newlines: bool) -> String {
     if newlines {
         format!("<{}>\n{}</{}>\n", name, content, name)
     } else {
@@ -27,7 +27,7 @@ pub(crate) fn wrap_xml(name: &str, content: &str, newlines: bool) -> String {
     }
 }
 
-pub(crate) fn parse_csv(data: &str) -> Vec<Vec<String>> {
+pub fn parse_csv(data: &str) -> Vec<Vec<String>> {
     // do not include empty lines or empty fields
     data.lines()
         .filter(|line| !line.is_empty())
@@ -40,7 +40,8 @@ pub(crate) fn parse_csv(data: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-pub(crate) fn validate_authed_request(
+pub fn validate_authed_request(
+    secret: &[u8],
     headers: &HeaderMap,
     caps: Vec<TokenCapability>,
 ) -> Result<i64, String> {
@@ -55,10 +56,10 @@ pub(crate) fn validate_authed_request(
         return Err("Invalid auth header".to_string());
     }
     let token = parts[1];
-    auth::validate_jwt(token, caps)
+    tokens::validate_jwt(secret, token, caps)
 }
 
-pub(crate) fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {
+pub fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {
     let mut code_bytes = [0u8; N];
     rng.fill(&mut code_bytes).unwrap();
     let mut code = String::new();
@@ -68,7 +69,7 @@ pub(crate) fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {
     code
 }
 
-pub(crate) fn mask_email(email: &str) -> String {
+pub fn mask_email(email: &str) -> String {
     let parts: Vec<&str> = email.split('@').collect();
     let revealed_len = min(3, parts[0].len());
     let masked = format!("{}******@{}", &parts[0][..revealed_len], parts[1]);

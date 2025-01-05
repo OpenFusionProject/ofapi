@@ -84,9 +84,13 @@ async fn get_cookie(
 
     let account_id =
         match util::validate_authed_request(key, &headers, vec![TokenCapability::GetCookie]) {
-            Ok(id) => id,
+            Ok(id) => id.parse::<i64>(),
             Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
         };
+    let account_id = match account_id {
+        Ok(id) => id,
+        Err(_) => return Err((StatusCode::UNAUTHORIZED, "Bad token".to_string())),
+    };
 
     let cookie = gen_cookie(&app.rng);
     let valid_secs = app.config.cookie.as_ref().unwrap().valid_secs;

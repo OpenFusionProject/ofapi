@@ -98,7 +98,7 @@ fn get_validator(account_id: Option<i64>) -> Validation {
     validation
 }
 
-pub fn validate_jwt(key: &[u8], jwt: &str, caps: Vec<TokenCapability>) -> Result<i64, String> {
+pub fn validate_jwt(key: &[u8], jwt: &str, caps: Vec<TokenCapability>) -> Result<String, String> {
     let key = DecodingKey::from_secret(key);
     let validation = get_validator(None);
     let Ok(token) = jsonwebtoken::decode::<Claims>(jwt, &key, &validation) else {
@@ -118,8 +118,5 @@ pub fn validate_jwt(key: &[u8], jwt: &str, caps: Vec<TokenCapability>) -> Result
         }
     }
 
-    match token.claims.sub.parse() {
-        Ok(id) => Ok(id),
-        Err(e) => Err(format!("Bad account ID: {}", e)),
-    }
+    Ok(token.claims.sub)
 }

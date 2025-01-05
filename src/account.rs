@@ -136,9 +136,13 @@ async fn get_account_info(
     let account_id =
         match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
         {
-            Ok(id) => id,
+            Ok(id) => id.parse::<i64>(),
             Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
         };
+    let account_id = match account_id {
+        Ok(id) => id,
+        Err(_) => return Err((StatusCode::UNAUTHORIZED, "Bad token".to_string())),
+    };
 
     let db = app.db.lock().await;
     let Some(account) = database::find_account(&db, account_id) else {
@@ -357,9 +361,13 @@ async fn update_password(
     let account_id =
         match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
         {
-            Ok(id) => id,
+            Ok(id) => id.parse::<i64>(),
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };
+    let account_id = match account_id {
+        Ok(id) => id,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Bad token".to_string()),
+    };
 
     let db = app.db.lock().await;
     let Ok(username) = database::check_password(&db, account_id, &req.password) else {
@@ -409,9 +417,13 @@ async fn update_email(
     let account_id =
         match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
         {
-            Ok(id) => id,
+            Ok(id) => id.parse::<i64>(),
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };
+    let account_id = match account_id {
+        Ok(id) => id,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Bad token".to_string()),
+    };
 
     let db = app.db.lock().await;
     let Ok(username) = database::check_password(&db, account_id, &req.password) else {

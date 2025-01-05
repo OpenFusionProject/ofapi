@@ -44,7 +44,7 @@ pub fn validate_authed_request(
     secret: &[u8],
     headers: &HeaderMap,
     caps: Vec<TokenCapability>,
-) -> Result<i64, String> {
+) -> Result<String, String> {
     let auth_header = headers.get("authorization").ok_or("No auth header")?;
     // auth header uses the Bearer scheme
     let parts: Vec<&str> = auth_header

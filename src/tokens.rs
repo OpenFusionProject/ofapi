@@ -39,7 +39,7 @@ impl TokenCapabilities {
     }
 
     pub fn check(&self, capability: TokenCapability) -> bool {
-        (self.capabilities & (1 << capability as u64)) != 0
+        (self.capabilities & (capability as u64)) != 0
     }
 
     pub fn from_vec(capabilities: Vec<TokenCapability>) -> Self {

@@ -13,7 +13,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use sqlite::Connection;
 
-use crate::{auth::TokenKind, database, util, AppState};
+use crate::{auth::TokenCapability, database, util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct CookieConfig {
@@ -71,7 +71,8 @@ async fn get_cookie(
     headers: HeaderMap,
 ) -> Result<Json<CookieResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
+    let account_id = match util::validate_authed_request(&headers, vec![TokenCapability::GetCookie])
+    {
         Ok(id) => id,
         Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
     };

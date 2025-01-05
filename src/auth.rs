@@ -10,7 +10,6 @@ use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey, Validation};
 use log::{info, warn};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{database, util, AppState};
 
@@ -29,19 +28,56 @@ pub(crate) struct AuthRequest {
     password: String,
 }
 
-#[repr(u8)]
-#[derive(Deserialize_repr, Serialize_repr, PartialEq, Eq)]
-pub(crate) enum TokenKind {
-    Refresh = 0,
-    Session = 1,
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum TokenLifetime {
+    ShortTerm,   // e.g. session tokens
+    LongTerm,    // e.g. refresh tokens
+    Permanent,   // e.g. API keys (use with caution)
+    Custom(u64), // duration in secs
+}
+
+#[repr(u64)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TokenCapability {
+    // lower privileges
+    Refresh = (1 << 0),
+    ManageOwnAccount = (1 << 1),
+    GetCookie = (1 << 2),
+    // higher privileges (dangerous)
+    ApproveNames = (1 << 20),
+    // highest privileges (very dangerous)
+    ManageAllAccounts = (1 << 40),
+}
+
+pub(crate) struct TokenCapabilities {
+    capabilities: u64,
+}
+impl TokenCapabilities {
+    pub(crate) fn new() -> Self {
+        Self { capabilities: 0 }
+    }
+
+    pub(crate) fn load(capabilities: u64) -> Self {
+        Self { capabilities }
+    }
+
+    pub(crate) fn with(self, capability: TokenCapability) -> Self {
+        Self {
+            capabilities: self.capabilities | (1 << capability as u64),
+        }
+    }
+
+    pub(crate) fn check(&self, capability: TokenCapability) -> bool {
+        (self.capabilities & (1 << capability as u64)) != 0
+    }
 }
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct Claims {
-    sub: String,     // account id as a string
-    crt: u64,        // creation timestamp in UTC
-    exp: u64,        // expiration timestamp in UTC
-    kind: TokenKind, // kind of token
+    sub: String, // account id as a string
+    crt: u64,    // creation timestamp in UTC
+    exp: u64,    // expiration timestamp in UTC
+    caps: u64,   // token capabilities
 }
 
 static SECRET_KEY: OnceLock<Vec<u8>> = OnceLock::new();
@@ -80,22 +116,28 @@ pub(crate) fn register(
         .route(&refresh_route, post(do_refresh))
 }
 
-fn gen_jwt(auth_config: &AuthConfig, account_id: i64, kind: TokenKind) -> Result<String, String> {
+fn gen_jwt(
+    auth_config: &AuthConfig,
+    subject: String,
+    caps: TokenCapabilities,
+    lifetime: TokenLifetime,
+) -> Result<String, String> {
     let secret = SECRET_KEY.get().unwrap();
     let key = EncodingKey::from_secret(secret);
 
-    let valid_secs = match kind {
-        TokenKind::Refresh => auth_config.valid_secs_refresh,
-        TokenKind::Session => auth_config.valid_secs_session,
+    let crt = get_current_timestamp();
+    let exp = match lifetime {
+        TokenLifetime::ShortTerm => crt + auth_config.valid_secs_session,
+        TokenLifetime::LongTerm => crt + auth_config.valid_secs_refresh,
+        TokenLifetime::Permanent => u64::MAX,
+        TokenLifetime::Custom(duration_secs) => crt + duration_secs,
     };
 
-    let crt = get_current_timestamp();
-    let exp = crt + valid_secs;
     let claims = Claims {
-        sub: account_id.to_string(),
+        sub: subject,
         crt,
         exp,
-        kind,
+        caps: caps.capabilities,
     };
 
     jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &key)
@@ -112,7 +154,7 @@ fn get_validator(account_id: Option<i64>) -> Validation {
     validation
 }
 
-pub(crate) fn validate_jwt(jwt: &str, kind: TokenKind) -> Result<i64, String> {
+pub(crate) fn validate_jwt(jwt: &str, caps: Vec<TokenCapability>) -> Result<i64, String> {
     let Some(secret) = SECRET_KEY.get() else {
         return Err("Auth module not initialized".to_string());
     };
@@ -129,8 +171,11 @@ pub(crate) fn validate_jwt(jwt: &str, kind: TokenKind) -> Result<i64, String> {
         return Err("Expired JWT".to_string());
     }
 
-    if token.claims.kind != kind {
-        return Err("Bad token kind".to_string());
+    let token_caps = TokenCapabilities::load(token.claims.caps);
+    for cap in &caps {
+        if !token_caps.check(*cap) {
+            return Err(format!("Missing capability: {:?}", cap));
+        }
     }
 
     match token.claims.sub.parse() {
@@ -152,8 +197,9 @@ async fn do_auth(
         })?;
     match gen_jwt(
         app.config.auth.as_ref().unwrap(),
-        account_id,
-        TokenKind::Refresh,
+        account_id.to_string(),
+        TokenCapabilities::new().with(TokenCapability::Refresh),
+        TokenLifetime::LongTerm,
     ) {
         Ok(jwt) => Ok(jwt),
         Err(e) => {
@@ -177,7 +223,7 @@ async fn do_refresh(
     headers: HeaderMap,
 ) -> Result<Json<RefreshResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, TokenKind::Refresh) {
+    let account_id = match util::validate_authed_request(&headers, vec![TokenCapability::Refresh]) {
         Ok(id) => id,
         Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
     };
@@ -195,10 +241,15 @@ async fn do_refresh(
     };
     // TODO validate the refresh token against the last password reset timestamp
 
+    let caps = TokenCapabilities::new()
+        .with(TokenCapability::ManageOwnAccount)
+        .with(TokenCapability::GetCookie);
+
     match gen_jwt(
         app.config.auth.as_ref().unwrap(),
-        account_id,
-        TokenKind::Session,
+        account_id.to_string(),
+        caps,
+        TokenLifetime::ShortTerm,
     ) {
         Ok(jwt) => Ok(Json(RefreshResponse {
             username,

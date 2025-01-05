@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    auth::TokenKind,
+    auth::TokenCapability,
     database,
     email::{self, EmailVerificationKind},
     util, AppState,
@@ -125,10 +125,11 @@ async fn get_account_info(
     headers: HeaderMap,
 ) -> Result<Json<AccountInfoResponse>, (StatusCode, String)> {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
-        Ok(id) => id,
-        Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
-    };
+    let account_id =
+        match util::validate_authed_request(&headers, vec![TokenCapability::ManageOwnAccount]) {
+            Ok(id) => id,
+            Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
+        };
     let db = app.db.lock().await;
     let Some(account) = database::find_account(&db, account_id) else {
         // account should definitely exist
@@ -335,10 +336,11 @@ async fn update_password(
     Json(req): Json<UpdatePasswordRequest>,
 ) -> (StatusCode, String) {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
-        Ok(id) => id,
-        Err(e) => return (StatusCode::UNAUTHORIZED, e),
-    };
+    let account_id =
+        match util::validate_authed_request(&headers, vec![TokenCapability::ManageOwnAccount]) {
+            Ok(id) => id,
+            Err(e) => return (StatusCode::UNAUTHORIZED, e),
+        };
 
     let db = app.db.lock().await;
     let Ok(username) = database::check_password(&db, account_id, &req.password) else {
@@ -377,10 +379,11 @@ async fn update_email(
     Json(req): Json<UpdateEmailRequest>,
 ) -> (StatusCode, String) {
     assert!(app.is_tls);
-    let account_id = match util::validate_authed_request(&headers, TokenKind::Session) {
-        Ok(id) => id,
-        Err(e) => return (StatusCode::UNAUTHORIZED, e),
-    };
+    let account_id =
+        match util::validate_authed_request(&headers, vec![TokenCapability::ManageOwnAccount]) {
+            Ok(id) => id,
+            Err(e) => return (StatusCode::UNAUTHORIZED, e),
+        };
 
     let db = app.db.lock().await;
     let Ok(username) = database::check_password(&db, account_id, &req.password) else {

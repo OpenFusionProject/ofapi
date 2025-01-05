@@ -3,7 +3,7 @@ use std::cmp::min;
 use axum::http::HeaderMap;
 use ring::rand::{SecureRandom as _, SystemRandom};
 
-use crate::auth::{self, TokenKind};
+use crate::auth::{self, TokenCapability};
 
 pub(crate) fn version_to_string(version: usize) -> String {
     // ex: 3045003 -> "3.45.3"
@@ -40,7 +40,10 @@ pub(crate) fn parse_csv(data: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-pub(crate) fn validate_authed_request(headers: &HeaderMap, kind: TokenKind) -> Result<i64, String> {
+pub(crate) fn validate_authed_request(
+    headers: &HeaderMap,
+    caps: Vec<TokenCapability>,
+) -> Result<i64, String> {
     let auth_header = headers.get("authorization").ok_or("No auth header")?;
     // auth header uses the Bearer scheme
     let parts: Vec<&str> = auth_header
@@ -52,7 +55,7 @@ pub(crate) fn validate_authed_request(headers: &HeaderMap, kind: TokenKind) -> R
         return Err("Invalid auth header".to_string());
     }
     let token = parts[1];
-    auth::validate_jwt(token, kind)
+    auth::validate_jwt(token, caps)
 }
 
 pub(crate) fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {

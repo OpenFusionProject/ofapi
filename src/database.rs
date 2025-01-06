@@ -1,6 +1,8 @@
 use log::*;
 use sqlite::{Connection, State};
 
+use crate::moderation::NameCheckStatus;
+
 const MIN_DATABASE_VERSION: i64 = 6;
 
 #[allow(dead_code)]
@@ -240,4 +242,28 @@ pub(crate) fn get_outstanding_namereqs(db: &Connection) -> Vec<(i64, String)> {
         results.push((player_id, format!("{} {}", first_name, last_name)));
     }
     results
+}
+
+pub(crate) fn set_namecheck_for_player(
+    db: &Connection,
+    player_uid: i64,
+    name_check_status: NameCheckStatus,
+) -> Result<(), String> {
+    const QUERY: &str = "
+        UPDATE Players
+        SET NameCheck = ?
+        WHERE PlayerID = ?;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    let name_check_flag = match name_check_status {
+        NameCheckStatus::Pending => 0,
+        NameCheckStatus::Approved => 1,
+        NameCheckStatus::Denied => 2,
+    };
+    stmt.bind((1, name_check_flag)).unwrap();
+    stmt.bind((2, player_uid)).unwrap();
+    if let Err(e) = stmt.next() {
+        return Err(e.to_string());
+    }
+    Ok(())
 }

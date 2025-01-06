@@ -35,11 +35,29 @@ struct NameRequest {
     requested_name: String,
 }
 
+#[derive(Debug)]
+pub(crate) enum NameCheckStatus {
+    Pending,
+    Approved,
+    Denied,
+}
+impl NameCheckStatus {
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "pending" => Some(Self::Pending),
+            "approved" => Some(Self::Approved),
+            "denied" => Some(Self::Denied),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct NameRequestDecision {
     player_uid: u64,
     requested_name: String,
     decision: String,
+    by: String,
 }
 
 async fn get_outstanding_requests(
@@ -87,9 +105,29 @@ async fn name_request(
         return (StatusCode::UNAUTHORIZED, "Unauthorized".to_string());
     }
 
+    let Some(new_status) = NameCheckStatus::from_str(&req.decision) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Invalid decision; must be either approved, denied, or pending".to_string(),
+        );
+    };
+
     info!(
-        "Name request: {} -> {} [{}]",
-        req.player_uid, req.requested_name, req.decision
+        "Name request: {} -> {} [{} by {}]",
+        req.player_uid, req.requested_name, req.decision, req.by
     );
+
+    let db = app.db.lock().await;
+    if let Err(e) = database::set_namecheck_for_player(&db, req.player_uid as i64, new_status) {
+        warn!(
+            "Failed to update name check flag for player {}: {}",
+            req.player_uid, e
+        );
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server error".to_string(),
+        );
+    }
+
     (StatusCode::OK, req.decision)
 }

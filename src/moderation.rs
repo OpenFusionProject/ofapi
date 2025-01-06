@@ -127,10 +127,14 @@ async fn name_request(
         }
         Ok(0) => {}
         _ => {
+            info!(
+                "Name request already processed for player {}",
+                req.player_uid
+            );
             return (
                 StatusCode::ALREADY_REPORTED,
                 "No name check pending".to_string(),
-            )
+            );
         }
     }
 

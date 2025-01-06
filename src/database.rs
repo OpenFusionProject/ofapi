@@ -244,6 +244,21 @@ pub(crate) fn get_outstanding_namereqs(db: &Connection) -> Vec<(i64, String)> {
     results
 }
 
+pub(crate) fn get_namecheck_for_player(db: &Connection, player_uid: i64) -> Result<i64, String> {
+    const QUERY: &str = "
+        SELECT NameCheck
+        FROM Players
+        WHERE PlayerID = ?;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, player_uid)).unwrap();
+    if let Ok(State::Row) = stmt.next() {
+        Ok(stmt.read(0).unwrap())
+    } else {
+        Err("Player not found".to_string())
+    }
+}
+
 pub(crate) fn set_namecheck_for_player(
     db: &Connection,
     player_uid: i64,

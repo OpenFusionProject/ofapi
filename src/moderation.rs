@@ -118,6 +118,22 @@ async fn name_request(
     );
 
     let db = app.db.lock().await;
+    match database::get_namecheck_for_player(&db, req.player_uid as i64) {
+        Err(e) => {
+            warn!(
+                "Failed to get name check flag for player {}: {}",
+                req.player_uid, e
+            )
+        }
+        Ok(0) => {}
+        _ => {
+            return (
+                StatusCode::ALREADY_REPORTED,
+                "No name check pending".to_string(),
+            )
+        }
+    }
+
     if let Err(e) = database::set_namecheck_for_player(&db, req.player_uid as i64, new_status) {
         warn!(
             "Failed to update name check flag for player {}: {}",

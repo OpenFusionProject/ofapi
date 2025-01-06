@@ -224,3 +224,20 @@ pub(crate) fn check_password(
         Err("Account not found".to_string())
     }
 }
+
+pub(crate) fn get_outstanding_namereqs(db: &Connection) -> Vec<(i64, String)> {
+    const QUERY: &str = "
+        SELECT PlayerID, FirstName, LastName
+        FROM Players
+        WHERE NameCheck = 0;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    let mut results = Vec::new();
+    while let Ok(State::Row) = stmt.next() {
+        let player_id: i64 = stmt.read(0).unwrap();
+        let first_name: String = stmt.read(1).unwrap();
+        let last_name: String = stmt.read(2).unwrap();
+        results.push((player_id, format!("{} {}", first_name, last_name)));
+    }
+    results
+}

@@ -123,7 +123,13 @@ async fn name_request(
             warn!(
                 "Failed to get name check flag for player {}: {}",
                 req.player_uid, e
-            )
+            );
+            // if this happens, the player doesn't exist. it was probably deleted.
+            // just void the request.
+            return (
+                StatusCode::ALREADY_REPORTED,
+                format!("Player {} does not exist", req.player_uid),
+            );
         }
         Ok(0) => {}
         _ => {
@@ -133,7 +139,7 @@ async fn name_request(
             );
             return (
                 StatusCode::ALREADY_REPORTED,
-                "No name check pending".to_string(),
+                format!("No name check pending for player {}", req.player_uid),
             );
         }
     }

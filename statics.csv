@@ -2,4 +2,7 @@
 /versions, static/versions/
 /launcher, static/launcher/
 /privacy, static/privacy_policy.txt
-/announcements, static/announcements.txt
+/announcements.png, static/announcements.png
+/announcements.md, static/announcements.md
+/sponsor.php, static/sponsor.php
+/images.php, static/images.php

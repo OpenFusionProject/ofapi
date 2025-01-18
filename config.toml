@@ -64,3 +64,13 @@ valid_secs_session = 900 # 15 minutes
 [cookie]
 route = "/cookie"
 valid_secs = 60
+
+[legacy]
+# These routes are used in the case of a legacy web-browser based game
+# clients such as Electron. If you do not use these, you can disable them.
+# When multiple versions are provided, legacy endpoints will use the first one.
+assetinfo_route = "/assetInfo.php"
+logininfo_route = "/loginInfo.php"
+local_route = "/local.php"
+# What number to report in local.php (default 0 for US)
+local_num = 0

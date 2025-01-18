@@ -16,6 +16,7 @@ pub use ofapi::util;
 mod account;
 mod auth;
 mod cookie;
+mod legacy;
 mod moderation;
 mod monitor;
 mod rankinfo;
@@ -59,6 +60,7 @@ struct Config {
     account: Option<account::AccountConfig>,
     auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
+    legacy: Option<legacy::LegacyConfig>,
 }
 impl Config {
     fn load() -> Self {
@@ -120,6 +122,9 @@ async fn main() {
     }
     if let Some(ref monitor_config) = config.monitor {
         routes = monitor::register(routes, monitor_config);
+    }
+    if let Some(ref legacy_config) = config.legacy {
+        routes = legacy::register(routes, legacy_config, config.game.versions.first())
     }
 
     // register HTTPS-only endpoints

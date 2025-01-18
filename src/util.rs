@@ -75,3 +75,31 @@ pub fn mask_email(email: &str) -> String {
     let masked = format!("{}******@{}", &parts[0][..revealed_len], parts[1]);
     masked
 }
+
+fn split_addr_port(addr_port: &str) -> Option<(String, u16)> {
+    const DEFAULT_PORT: u16 = 23000;
+    let mut parts = addr_port.split(':');
+    let addr = parts.next().ok_or("Missing address").ok()?.to_string();
+    let port = if let Some(port) = parts.next() {
+        port.parse::<u16>().ok()?
+    } else {
+        DEFAULT_PORT
+    };
+    Some((addr, port))
+}
+
+fn resolve_host(host: &str) -> Option<String> {
+    let addrs = dns_lookup::lookup_host(host).ok()?;
+    for addr in addrs {
+        if let std::net::IpAddr::V4(addr) = addr {
+            return Some(addr.to_string());
+        }
+    }
+    None
+}
+
+pub fn resolve_server_addr(addr: &str) -> Option<String> {
+    let (host, port) = split_addr_port(addr)?;
+    let ip = resolve_host(&host)?;
+    Some(format!("{}:{}", ip, port))
+}

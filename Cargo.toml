@@ -9,6 +9,7 @@ axum = { version = "0.7.5", features = ["multipart", "query"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"], optional = true }
 base64 = "0.22.1"
 bcrypt = "0.15.1"
+dns-lookup = "2.0.4"
 ffmonitor = { git = "https://github.com/OpenFusionProject/ffmonitor", tag = "v1.2.1" }
 jsonwebtoken = "9.3.0"
 log = "0.4.22"
@@ -16,6 +17,7 @@ regex = "1.11.1"
 ring = "0.17.8"
 rustls = { version = "0.23.12", features = ["ring"], default-features = false, optional = true }
 serde = { version = "1.0.209", features = ["derive"] }
+serde_json = "1.0.135"
 serde_repr = "0.1.19"
 simplelog = "0.12.2"
 sqlite = "0.36.1"

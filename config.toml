@@ -2,6 +2,7 @@
 server_name = "My OpenFusion Server"
 public_url = "api.example.xyz"
 db_path = "../OpenFusion/database.db"
+template_dir = "./templates"
 port = 8888
 
 [tls]
@@ -10,7 +11,7 @@ key_path = "key.pem" # app-level TLS only
 port = 4433
 
 [email]
-template_dir = "./templates"
+# SMTP credentials, etc. will be here once email is implemented
 
 [game]
 # GUID of the game versions compatible the OpenFusion server.
@@ -66,9 +67,10 @@ route = "/cookie"
 valid_secs = 60
 
 [legacy]
-# These routes are used in the case of a legacy web-browser based game
-# clients such as Electron. If you do not use these, you can disable them.
+# These routes are used in the case of a legacy web-browser based game clients such 
+# as Electron. If you do not use these, you can remove this section of the config.
 # When multiple versions are provided, legacy endpoints will use the first one.
+index_route = "/index.html"
 assetinfo_route = "/assetInfo.php"
 logininfo_route = "/loginInfo.php"
 local_route = "/local.php"

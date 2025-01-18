@@ -30,6 +30,7 @@ struct CoreConfig {
     server_name: String,
     public_url: String,
     db_path: String,
+    template_dir: String,
     port: Option<u16>,
 }
 
@@ -124,7 +125,12 @@ async fn main() {
         routes = monitor::register(routes, monitor_config);
     }
     if let Some(ref legacy_config) = config.legacy {
-        routes = legacy::register(routes, legacy_config, config.game.versions.first())
+        routes = legacy::register(
+            routes,
+            legacy_config,
+            config.game.versions.first(),
+            &config.core.template_dir,
+        )
     }
 
     // register HTTPS-only endpoints

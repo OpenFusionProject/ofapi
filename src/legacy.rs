@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     sync::{Arc, OnceLock},
 };
@@ -6,7 +7,7 @@ use std::{
 use axum::{
     extract::State,
     http::StatusCode,
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::{get, Router},
 };
 use log::{info, warn};
@@ -17,6 +18,7 @@ use crate::AppState;
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct LegacyConfig {
+    index_route: String,
     assetinfo_route: String,
     logininfo_route: String,
     local_route: String,
@@ -27,57 +29,83 @@ pub(crate) struct LegacyConfig {
 struct MinimalVersionManifest {
     uuid: String,
     asset_url: String,
+    main_file_url: String,
 }
 
-static ASSET_URL: OnceLock<String> = OnceLock::new();
+static INDEX_PAGE: OnceLock<String> = OnceLock::new();
+static VERSION_MANIFEST: OnceLock<MinimalVersionManifest> = OnceLock::new();
 static LOGIN_ADDRESS: OnceLock<String> = OnceLock::new();
 
 pub(crate) fn register(
     routes: Router<Arc<AppState>>,
     config: &LegacyConfig,
     uuid: Option<&String>,
+    template_dir: &str,
 ) -> Router<Arc<AppState>> {
+    let index_route = &config.index_route;
     let assetinfo_route = &config.assetinfo_route;
     let logininfo_route = &config.logininfo_route;
     let local_route = &config.local_route;
 
     if let Some(uuid) = uuid {
-        if set_asset_url(uuid).is_err() {
-            warn!("Skipping legacy route as version could not be found.");
+        if init_version_manifest(uuid).is_err() {
+            warn!("Skipping legacy routes as version could not be found.");
             return routes;
         }
     } else {
         warn!("Skipping legacy routes as no versions are specified.");
         return routes;
     }
+    if generate_index_page(template_dir).is_err() {
+        warn!("Skipping legacy routes since we couldn't generate legacy index page.")
+    }
 
     info!("Registering legacy routes");
+    info!("\tIndex route @ {}", index_route);
     info!("\tAsset info route @ {}", assetinfo_route);
     info!("\tLogin info route @ {}", logininfo_route);
     info!("\tLocal route @ {}", local_route);
 
     routes
+        .route(index_route, get(get_index))
         .route(assetinfo_route, get(get_assetinfo))
         .route(logininfo_route, get(get_logininfo))
         .route(local_route, get(get_local))
 }
 
-fn set_asset_url(uuid: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn init_version_manifest(uuid: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_name = format!("static/versions/{}.json", uuid);
     let contents = fs::read(file_name)?;
     let contents = String::from_utf8(contents)?;
-    let manifest: MinimalVersionManifest = serde_json::from_str(&contents)?;
+    let mut manifest: MinimalVersionManifest = serde_json::from_str(&contents)?;
 
     if manifest.uuid != uuid {
         return Err("UUID of version in config does not match manifest.".into());
     };
 
-    ASSET_URL.set(manifest.asset_url)?;
+    // Legacy client needs trailing slash, so we add it here
+    manifest.asset_url += "/";
+    VERSION_MANIFEST.set(manifest).unwrap();
     Ok(())
 }
 
+fn generate_index_page(template_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut vars = HashMap::new();
+    vars.insert(
+        "UNITY_MAIN_FILE".to_string(),
+        VERSION_MANIFEST.get().unwrap().main_file_url.clone(),
+    );
+    let content = util::gen_content_from_template(template_dir, "legacy_index.html", &vars)?;
+    INDEX_PAGE.set(content)?;
+    Ok(())
+}
+
+async fn get_index() -> impl IntoResponse {
+    Html(INDEX_PAGE.get().unwrap().clone())
+}
+
 async fn get_assetinfo() -> impl IntoResponse {
-    ASSET_URL.get().unwrap().clone()
+    VERSION_MANIFEST.get().unwrap().asset_url.clone()
 }
 
 async fn get_logininfo(State(state): State<Arc<AppState>>) -> impl IntoResponse {

@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::{cmp::min, collections::HashMap};
 
 use axum::http::HeaderMap;
 use ring::rand::{SecureRandom as _, SystemRandom};
@@ -74,6 +74,23 @@ pub fn mask_email(email: &str) -> String {
     let revealed_len = min(3, parts[0].len());
     let masked = format!("{}******@{}", &parts[0][..revealed_len], parts[1]);
     masked
+}
+
+pub fn gen_content_from_template(
+    template_dir: &str,
+    template_file: &str,
+    vars: &HashMap<String, String>,
+) -> Result<String, String> {
+    let template_path = format!("{}/{}", template_dir, template_file);
+    let template = match std::fs::read_to_string(template_path) {
+        Ok(content) => content,
+        Err(e) => return Err(format!("Failed to read template file: {}", e)),
+    };
+    let mut content = template;
+    for (key, value) in vars {
+        content = content.replace(&format!("${}$", key), value);
+    }
+    Ok(content)
 }
 
 fn split_addr_port(addr_port: &str) -> Option<(String, u16)> {

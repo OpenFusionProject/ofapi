@@ -7,24 +7,7 @@ use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct EmailConfig {
-    template_dir: String,
-}
-
-fn gen_email_content_from_template(
-    template_dir: &str,
-    template_name: &str,
-    vars: HashMap<String, String>,
-) -> Result<String, String> {
-    let template_path = format!("{}/{}.html", template_dir, template_name);
-    let template = match std::fs::read_to_string(template_path) {
-        Ok(content) => content,
-        Err(e) => return Err(format!("Failed to read template file: {}", e)),
-    };
-    let mut content = template;
-    for (key, value) in vars {
-        content = content.replace(&format!("${}$", key), &value);
-    }
-    Ok(content)
+    // TODO
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +88,7 @@ pub(crate) async fn send_verification_email(
         format!("http://{}/privacy", public_url),
     );
     let content =
-        gen_email_content_from_template(&email_config.template_dir, "verify_email", vars)?;
+        util::gen_content_from_template(&app.config.core.template_dir, "verify_email.html", &vars)?;
     println!("{}", content);
 
     // Send the email

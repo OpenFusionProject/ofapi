@@ -73,6 +73,3 @@ valid_secs = 60
 index_route = "/index.html"
 assetinfo_route = "/assetInfo.php"
 logininfo_route = "/loginInfo.php"
-local_route = "/local.php"
-# What number to report in local.php (default 0 for US)
-local_num = 0

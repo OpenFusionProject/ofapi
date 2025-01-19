@@ -21,8 +21,6 @@ pub(crate) struct LegacyConfig {
     index_route: String,
     assetinfo_route: String,
     logininfo_route: String,
-    local_route: String,
-    local_num: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,7 +43,6 @@ pub(crate) fn register(
     let index_route = &config.index_route;
     let assetinfo_route = &config.assetinfo_route;
     let logininfo_route = &config.logininfo_route;
-    let local_route = &config.local_route;
 
     if let Some(uuid) = uuid {
         if init_version_manifest(uuid).is_err() {
@@ -64,13 +61,11 @@ pub(crate) fn register(
     info!("\tIndex route @ {}", index_route);
     info!("\tAsset info route @ {}", assetinfo_route);
     info!("\tLogin info route @ {}", logininfo_route);
-    info!("\tLocal route @ {}", local_route);
 
     routes
         .route(index_route, get(get_index))
         .route(assetinfo_route, get(get_assetinfo))
         .route(logininfo_route, get(get_logininfo))
-        .route(local_route, get(get_local))
 }
 
 fn init_version_manifest(uuid: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -120,8 +115,4 @@ async fn get_logininfo(State(state): State<Arc<AppState>>) -> impl IntoResponse 
         LOGIN_ADDRESS.set(resolved.unwrap()).unwrap();
     }
     (StatusCode::OK, LOGIN_ADDRESS.get().unwrap())
-}
-
-async fn get_local(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    format!("Local:{}", state.config.legacy.as_ref().unwrap().local_num)
 }

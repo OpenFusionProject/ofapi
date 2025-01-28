@@ -1,6 +1,6 @@
 use std::{cmp::min, collections::HashMap};
 
-use axum::http::HeaderMap;
+use axum::{http::HeaderMap, response::Html};
 use ring::rand::{SecureRandom as _, SystemRandom};
 
 use crate::tokens::{self, TokenCapability};
@@ -91,6 +91,41 @@ pub fn gen_content_from_template(
         content = content.replace(&format!("${}$", key), value);
     }
     Ok(content)
+}
+
+pub fn get_plain_page(title: &str, content: &str) -> Html<String> {
+    let content = format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+  <title>{}</title>
+</head>
+<body>
+  <p>{}</p>
+</body>
+</html>
+"#,
+        title, content
+    );
+    Html(content)
+}
+
+pub fn get_error_page(title: &str, message: &str) -> Html<String> {
+    let content = format!(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+  <title>Error</title>
+</head>
+<body>
+  <h1>{}</h1>
+  <p>{}</p>
+</body>
+</html>
+"#,
+        title, message
+    );
+    Html(content)
 }
 
 fn split_addr_port(addr_port: &str) -> Option<(String, u16)> {

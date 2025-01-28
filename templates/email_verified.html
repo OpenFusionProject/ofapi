@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verified</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    .close-button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #00b536;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+
+    #banner {
+      background-color: #00b536;
+      background-image: url('$BANNER_URL$');
+      background-size: cover;
+      background-position: center;
+      color: white;
+      padding: 10px;
+      font-size: 28px;
+      height: 40px;
+      line-height: 40px;
+    }
+
+    #banner img {
+      height: 90%;
+    }
+  </style>
+</head>
+<body>
+  <div id="banner">
+    <img src="$LOGO_URL$" alt="$SERVER_NAME$" />
+  </div>
+  <div id="content">
+    <h2>Email Verified</h1>
+    <p>Your email has been verified!</p>
+    <p>You can now safely close out of this tab.</p>
+    <a class="close-button" onclick="window.close()">Close Tab</a>
+    <br />
+    <a href="$PRIVACY_POLICY_URL$">Privacy Policy</a>
+  </div>
+</body>

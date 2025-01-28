@@ -1,8 +1,12 @@
-use std::sync::{Arc, LazyLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
 
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
+    response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
@@ -281,7 +285,7 @@ async fn register_account(
 async fn verify_email(
     State(app): State<Arc<AppState>>,
     req: Query<EmailVerificationRequest>,
-) -> (StatusCode, String) {
+) -> impl IntoResponse {
     let req = req.0;
     let code = req.code;
 
@@ -292,20 +296,54 @@ async fn verify_email(
             info!("Invalid email verification code");
             return (
                 StatusCode::BAD_REQUEST,
-                "Expired verification link".to_string(),
+                util::get_error_page("Error Verifying Email", "Invalid verification code"),
             );
         }
     };
 
+    // Generate the HTML content
+    let public_url = &app.config.core.public_url;
+    let mut vars = HashMap::new();
+    vars.insert(
+        "SERVER_NAME".to_string(),
+        app.config.core.server_name.clone(),
+    );
+    vars.insert(
+        "LOGO_URL".to_string(),
+        format!("http://{}/launcher/logo.png", public_url),
+    );
+    vars.insert(
+        "BANNER_URL".to_string(),
+        format!("http://{}/launcher/background.png", public_url),
+    );
+    vars.insert(
+        "PRIVACY_POLICY_URL".to_string(),
+        format!("http://{}/privacy", public_url),
+    );
+    let page_content = util::gen_content_from_template(
+        &app.config.core.template_dir,
+        "email_verified.html",
+        &vars,
+    );
+
     if verification.done {
-        return (StatusCode::OK, "Email verified".to_string());
+        match page_content {
+            Ok(content) => return (StatusCode::OK, Html(content)),
+            Err(e) => {
+                warn!("Failed to generate email verified page: {}", e);
+                return (
+                    StatusCode::OK,
+                    util::get_plain_page("Email Verified", "Your email has been verified"),
+                );
+            }
+        }
     }
 
     if verification.expires < get_current_timestamp() {
         info!("Expired email verification code");
         return (
             StatusCode::BAD_REQUEST,
-            "Expired verification link".to_string(),
+            util::get_error_page("Error Verifying Email", "Verification code expired"),
         );
     }
 
@@ -326,7 +364,7 @@ async fn verify_email(
                 error!("Failed to create account: {}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Server error".to_string(),
+                    util::get_error_page("Error Verifying Email", "Server error"),
                 );
             }
             username.clone()
@@ -336,7 +374,7 @@ async fn verify_email(
                 error!("Failed to update email for user {}: {}", username, e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Server error".to_string(),
+                    util::get_error_page("Error Verifying Email", "Server error"),
                 );
             }
             username.clone()
@@ -345,7 +383,16 @@ async fn verify_email(
 
     info!("Email verified for {}", username);
     verification.done = true;
-    (StatusCode::OK, "Email verified".to_string())
+    match page_content {
+        Ok(content) => (StatusCode::OK, Html(content)),
+        Err(e) => {
+            warn!("Failed to generate email verified page: {}", e);
+            (
+                StatusCode::OK,
+                util::get_plain_page("Email Verified", "Your email has been verified"),
+            )
+        }
+    }
 }
 
 async fn update_password(

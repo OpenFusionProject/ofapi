@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 use sqlite::Connection;
 use tokio::sync::Mutex;
+use tower_http::cors::{Any, CorsLayer};
 
 #[cfg(feature = "tls")]
 use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
@@ -132,6 +133,10 @@ async fn main() {
             &config.core.template_dir,
         )
     }
+
+    // add CORS headers for non-sensitive APIs
+    let cors = CorsLayer::new().allow_origin(Any);
+    routes = routes.layer(cors);
 
     // register HTTPS-only endpoints
     let mut routes_tls = Router::new().merge(routes.clone());

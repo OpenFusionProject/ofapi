@@ -286,7 +286,7 @@ async fn verify_email(
     let code = req.code;
 
     let mut verifications = app.email_verifications.lock().await;
-    let verification = match verifications.remove(&code) {
+    let verification = match verifications.get_mut(&code) {
         Some(v) => v,
         None => {
             info!("Invalid email verification code");
@@ -296,10 +296,10 @@ async fn verify_email(
             );
         }
     };
-    drop(verifications);
 
-    // we don't re-insert the verification code in an error condition.
-    // the user will have to make another registration or email verification request
+    if verification.done {
+        return (StatusCode::OK, "Email verified".to_string());
+    }
 
     if verification.expires < get_current_timestamp() {
         info!("Expired email verification code");
@@ -310,7 +310,7 @@ async fn verify_email(
     }
 
     let db = app.db.lock().await;
-    match verification.kind {
+    let username = match verification.kind {
         EmailVerificationKind::Register {
             ref username,
             ref password_hashed,
@@ -329,6 +329,7 @@ async fn verify_email(
                     "Server error".to_string(),
                 );
             }
+            username.clone()
         }
         EmailVerificationKind::Verify { ref username } => {
             if let Err(e) = database::update_email_for_account(&db, username, &verification.email) {
@@ -338,9 +339,12 @@ async fn verify_email(
                     "Server error".to_string(),
                 );
             }
+            username.clone()
         }
-    }
+    };
 
+    info!("Email verified for {}", username);
+    verification.done = true;
     (StatusCode::OK, "Email verified".to_string())
 }
 

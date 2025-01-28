@@ -1,0 +1,5 @@
+Welcome to $SERVER_NAME$, $USERNAME$!
+Click the link below to verify your email:
+$VERIFY_URL$
+If you didn't sign up for an account, you can ignore this email.
+Privacy Policy: $PRIVACY_POLICY_URL$

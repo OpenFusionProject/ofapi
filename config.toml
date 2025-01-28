@@ -11,7 +11,11 @@ key_path = "key.pem" # app-level TLS only
 port = 4433
 
 [email]
-# SMTP credentials, etc. will be here once email is implemented
+smtp_host = "smtp.example.xyz"
+smtp_port = 465
+smtp_email = "noreply@example.xyz"
+#smtp_username = "noreply@example.xyz" uncomment if different than email
+smtp_password = "mypassword"
 
 [game]
 # GUID of the game versions compatible the OpenFusion server.

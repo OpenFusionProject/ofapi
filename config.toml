@@ -14,7 +14,7 @@ port = 4433
 smtp_host = "smtp.example.xyz"
 smtp_port = 465
 smtp_email = "noreply@example.xyz"
-#smtp_username = "noreply@example.xyz" uncomment if different than email
+#smtp_username = "noreply@example.xyz" # uncomment if different than email
 smtp_password = "mypassword"
 
 [game]

@@ -8,7 +8,7 @@ const MIN_DATABASE_VERSION: i64 = 6;
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct Account {
-    id: i64,
+    pub(crate) id: i64,
     pub(crate) login: String,
     pub(crate) password_hashed: String,
     pub(crate) email: String,

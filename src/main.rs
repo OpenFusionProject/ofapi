@@ -77,6 +77,7 @@ struct AppState {
     db: Arc<Mutex<Connection>>,
     rng: Arc<SystemRandom>,
     email_verifications: Arc<Mutex<HashMap<String, email::EmailVerification>>>,
+    temp_passwords: Arc<Mutex<HashMap<String, email::TempPassword>>>,
     is_tls: bool,
     config: Config,
 }
@@ -91,6 +92,7 @@ impl AppState {
             db: Arc::new(Mutex::new(conn)),
             rng: Arc::new(SystemRandom::new()),
             email_verifications: Arc::new(Mutex::new(HashMap::new())),
+            temp_passwords: Arc::new(Mutex::new(HashMap::new())),
             is_tls: false,
             config: config.clone(),
         }

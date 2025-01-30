@@ -72,13 +72,32 @@ async fn do_auth(
 
     let key = SECRET_KEY.get().unwrap();
     let valid_secs = app.config.auth.as_ref().unwrap().valid_secs_refresh;
+    let mut account_id = None;
 
-    let db = app.db.lock().await;
-    let account_id =
-        database::check_credentials(&db, &req.username, &req.password).map_err(|e| {
-            warn!("Auth error: {}", e);
-            (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string())
-        })?;
+    // Check for a temp password first
+    {
+        let mut temp_passwords = app.temp_passwords.lock().await;
+        let tp = temp_passwords.remove(&req.username);
+        if let Some(tp) = tp {
+            if !tp.is_expired() && tp.password == req.password {
+                info!("Temp password used for {}", req.username);
+                account_id = Some(tp.account_id);
+            }
+        }
+    }
+
+    // Check credentials with the database
+    if account_id.is_none() {
+        let db = app.db.lock().await;
+        account_id = database::check_credentials(&db, &req.username, &req.password).ok();
+    }
+
+    // Still no auth
+    if account_id.is_none() {
+        return Err((StatusCode::UNAUTHORIZED, "Invalid credentials".to_string()));
+    }
+    let account_id = account_id.unwrap();
+
     match tokens::gen_jwt(
         key,
         account_id.to_string(),

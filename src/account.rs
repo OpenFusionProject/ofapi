@@ -10,7 +10,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use jsonwebtoken::get_current_timestamp;
 use log::*;
 use ofapi::tokens::TokenCapability;
 use regex::Regex;
@@ -53,6 +52,9 @@ pub(crate) struct AccountConfig {
     // Update
     update_email_subroute: String,
     update_password_subroute: String,
+    // One-time password
+    temporary_password_subroute: String,
+    temporary_password_valid_secs: u64,
 }
 impl AccountConfig {
     pub(crate) fn get_email_verification_route(&self) -> String {
@@ -65,6 +67,10 @@ impl AccountConfig {
 
     pub(crate) fn get_update_password_route(&self) -> String {
         util::get_subroute(&self.route, &self.update_password_subroute)
+    }
+
+    pub(crate) fn get_temporary_password_route(&self) -> String {
+        util::get_subroute(&self.route, &self.temporary_password_subroute)
     }
 
     pub(crate) fn is_email_required(&self) -> bool {
@@ -102,6 +108,11 @@ struct UpdateEmailRequest {
     new_email: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct TemporaryPasswordRequest {
+    email: String,
+}
+
 pub(crate) fn register(
     routes: Router<Arc<AppState>>,
     config: &AccountConfig,
@@ -116,12 +127,15 @@ pub(crate) fn register(
     info!("\tPassword update route @ {}", password_update_route);
     let email_update_route = config.get_update_email_route();
     info!("\tEmail update route @ {}", email_update_route);
+    let temporary_password_route = config.get_temporary_password_route();
+    info!("\tTemporary password route @ {}", temporary_password_route);
     routes
         .route(route, get(get_account_info))
         .route(&register_route, post(register_account))
         .route(&email_verification_route, get(verify_email))
         .route(&password_update_route, post(update_password))
         .route(&email_update_route, post(update_email))
+        .route(&temporary_password_route, post(get_temporary_password))
 }
 
 async fn get_account_info(
@@ -339,7 +353,7 @@ async fn verify_email(
         }
     }
 
-    if verification.expires < get_current_timestamp() {
+    if verification.is_expired() {
         info!("Expired email verification code");
         return (
             StatusCode::BAD_REQUEST,
@@ -507,4 +521,32 @@ async fn update_email(
     }
 
     (StatusCode::ACCEPTED, "Verification email sent".to_string())
+}
+
+async fn get_temporary_password(
+    State(app): State<Arc<AppState>>,
+    Json(req): Json<TemporaryPasswordRequest>,
+) -> (StatusCode, String) {
+    if !EMAIL_REGEX.is_match(&req.email) {
+        return (StatusCode::BAD_REQUEST, "Invalid email".to_string());
+    }
+
+    let valid_for = app
+        .config
+        .account
+        .as_ref()
+        .unwrap()
+        .temporary_password_valid_secs;
+
+    match email::send_temp_password_email(&app, &req.email, valid_for).await {
+        Ok(true) => (StatusCode::ACCEPTED, "Temporary password sent".to_string()),
+        Ok(false) => (StatusCode::UNAUTHORIZED, "Email not found".to_string()),
+        Err(e) => {
+            warn!("Failed to send temporary password: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            )
+        }
+    }
 }

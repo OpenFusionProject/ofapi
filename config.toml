@@ -57,6 +57,10 @@ email_verification_valid_secs = 3_600 # one hour
 update_email_subroute = "/update/email"
 update_password_subroute = "/update/password"
 
+## One-time password
+temporary_password_subroute = "/otp"
+temporary_password_valid_secs = 3_600 # one hour
+
 [auth]
 route = "/auth"
 refresh_subroute = "/session"

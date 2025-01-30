@@ -9,7 +9,7 @@ use lettre::{
 use log::*;
 use serde::Deserialize;
 
-use crate::{util, AppState};
+use crate::{database, util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct EmailConfig {
@@ -23,7 +23,7 @@ pub(crate) struct EmailConfig {
 #[derive(Debug, Clone)]
 pub(crate) struct EmailVerification {
     pub(crate) email: String,
-    pub(crate) expires: u64,
+    expires: u64,
     pub(crate) kind: EmailVerificationKind,
     pub(crate) done: bool,
 }
@@ -36,6 +36,10 @@ impl EmailVerification {
             done: false,
         }
     }
+
+    pub(crate) fn is_expired(&self) -> bool {
+        self.expires < get_current_timestamp()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +51,26 @@ pub(crate) enum EmailVerificationKind {
     Verify {
         username: String,
     },
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct TempPassword {
+    pub(crate) account_id: i64,
+    pub(crate) password: String,
+    expires: u64,
+}
+impl TempPassword {
+    pub(crate) fn new(account_id: i64, password: &str, valid_for: u64) -> Self {
+        Self {
+            account_id,
+            password: password.to_string(),
+            expires: get_current_timestamp() + valid_for,
+        }
+    }
+
+    pub(crate) fn is_expired(&self) -> bool {
+        self.expires < get_current_timestamp()
+    }
 }
 
 async fn send_email(
@@ -112,9 +136,10 @@ pub(crate) async fn send_verification_email(
     // Generate the code and store it in state
     let code = util::gen_random_string::<32>(&app.rng);
     let verification = EmailVerification::new(email, kind, valid_for);
-    let mut verifications = app.email_verifications.lock().await;
-    verifications.insert(code.clone(), verification);
-    drop(verifications);
+    {
+        let mut verifications = app.email_verifications.lock().await;
+        verifications.insert(code.clone(), verification);
+    }
 
     // Generate the verification link
     let account_config = app
@@ -159,7 +184,7 @@ pub(crate) async fn send_verification_email(
     // Send the email
     send_email(
         app,
-        None,
+        Some(username),
         email,
         "Verify Your Email",
         content_html,
@@ -169,4 +194,78 @@ pub(crate) async fn send_verification_email(
 
     info!("Sent verification email to {}", util::mask_email(email));
     Ok(())
+}
+
+pub(crate) async fn send_temp_password_email(
+    app: &AppState,
+    email: &str,
+    valid_for: u64,
+) -> Result<bool, String> {
+    // Find the account with the given email
+    let account = {
+        let db = app.db.lock().await;
+        match database::find_account_by_email(&db, email) {
+            Some(acc) => acc,
+            None => return Ok(false),
+        }
+    };
+    let username = account.login;
+
+    // Generate the temporary password and store it in state
+    let temp_password = util::gen_random_string::<12>(&app.rng);
+    {
+        let mut temp_passwords = app.temp_passwords.lock().await;
+        temp_passwords.insert(
+            username.clone(),
+            TempPassword::new(account.id, &temp_password, valid_for),
+        );
+    }
+
+    // Generate the email content
+    let public_url = &app.config.core.public_url;
+    let mut vars = HashMap::new();
+    vars.insert(
+        "SERVER_NAME".to_string(),
+        app.config.core.server_name.clone(),
+    );
+    vars.insert("USERNAME".to_string(), username.clone());
+    vars.insert("TEMP_PASSWORD".to_string(), temp_password);
+    vars.insert(
+        "LOGO_URL".to_string(),
+        format!("http://{}/launcher/logo.png", public_url),
+    );
+    vars.insert(
+        "BANNER_URL".to_string(),
+        format!("http://{}/launcher/background.png", public_url),
+    );
+    vars.insert(
+        "PRIVACY_POLICY_URL".to_string(),
+        format!("http://{}/privacy", public_url),
+    );
+
+    // We want emails to be sent in both HTML and plain text so older email clients can still read them
+    let content_html = util::gen_content_from_template(
+        &app.config.core.template_dir,
+        "temp_password.html",
+        &vars,
+    )?;
+    let content_txt =
+        util::gen_content_from_template(&app.config.core.template_dir, "temp_password.txt", &vars)?;
+
+    // Send the email
+    send_email(
+        app,
+        Some(&username),
+        email,
+        "Your One-Time Password",
+        content_html,
+        content_txt,
+    )
+    .await?;
+
+    info!(
+        "Sent temporary password email to {}",
+        util::mask_email(email)
+    );
+    Ok(true)
 }

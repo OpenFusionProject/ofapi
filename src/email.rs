@@ -6,6 +6,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     Message, SmtpTransport, Transport as _,
 };
+use log::*;
 use serde::Deserialize;
 
 use crate::{util, AppState};
@@ -164,5 +165,8 @@ pub(crate) async fn send_verification_email(
         content_html,
         content_txt,
     )
-    .await
+    .await?;
+
+    info!("Sent verification email to {}", util::mask_email(email));
+    Ok(())
 }

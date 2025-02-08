@@ -59,14 +59,16 @@ pub fn validate_authed_request(
     tokens::validate_jwt(secret, token, caps)
 }
 
-pub fn gen_random_string<const N: usize>(rng: &SystemRandom) -> String {
-    let mut code_bytes = [0u8; N];
-    rng.fill(&mut code_bytes).unwrap();
-    let mut code = String::new();
-    for byte in code_bytes.iter() {
-        code.push_str(&format!("{:02x}", byte));
-    }
-    code
+pub fn gen_random_string(len: usize, rng: &SystemRandom) -> String {
+    // 0-9, a-z
+    const CHARSET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let mut buf = vec![0; len];
+    rng.fill(&mut buf).unwrap();
+    let s: String = buf
+        .iter()
+        .map(|byte| CHARSET[*byte as usize % CHARSET.len()] as char)
+        .collect();
+    s
 }
 
 pub fn mask_email(email: &str) -> String {

@@ -134,7 +134,7 @@ pub(crate) async fn send_verification_email(
     valid_for: u64,
 ) -> Result<(), String> {
     // Generate the code and store it in state
-    let code = util::gen_random_string::<32>(&app.rng);
+    let code = util::gen_random_string(32, &app.rng);
     let verification = EmailVerification::new(email, kind, valid_for);
     {
         let mut verifications = app.email_verifications.lock().await;
@@ -212,7 +212,7 @@ pub(crate) async fn send_temp_password_email(
     let username = account.login;
 
     // Generate the temporary password and store it in state
-    let temp_password = util::gen_random_string::<12>(&app.rng);
+    let temp_password = util::gen_random_string(16, &app.rng);
     {
         let mut temp_passwords = app.temp_passwords.lock().await;
         temp_passwords.insert(

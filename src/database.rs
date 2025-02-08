@@ -201,32 +201,6 @@ pub(crate) fn check_credentials(
     }
 }
 
-pub(crate) fn check_password(
-    db: &Connection,
-    account_id: i64,
-    password: &str,
-) -> Result<String, String> {
-    const QUERY: &str = "
-        SELECT Login, Password
-        FROM Accounts
-        WHERE AccountID = ?
-        LIMIT 1;
-        ";
-    let mut stmt = db.prepare(QUERY).unwrap();
-    stmt.bind((1, account_id)).unwrap();
-    if let Ok(State::Row) = stmt.next() {
-        let username: String = stmt.read(0).unwrap();
-        let password_hashed: String = stmt.read(1).unwrap();
-        match bcrypt::verify(password, &password_hashed) {
-            Ok(true) => Ok(username),
-            Ok(false) => Err("Invalid password".to_string()),
-            Err(e) => Err(format!("bcrypt error: {}", e)),
-        }
-    } else {
-        Err("Account not found".to_string())
-    }
-}
-
 pub(crate) fn get_outstanding_namereqs(db: &Connection) -> Vec<(i64, String)> {
     const QUERY: &str = "
         SELECT PlayerID, FirstName, LastName

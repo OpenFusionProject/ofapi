@@ -98,13 +98,11 @@ struct EmailVerificationRequest {
 
 #[derive(Deserialize, Debug)]
 struct UpdatePasswordRequest {
-    password: String,
     new_password: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct UpdateEmailRequest {
-    password: String,
     new_email: String,
 }
 
@@ -426,18 +424,18 @@ async fn update_password(
     let account_id =
         match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
         {
-            Ok(id) => id.parse::<i64>(),
+            Ok(id) => id.parse::<i64>().unwrap(),
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };
-    let account_id = match account_id {
-        Ok(id) => id,
-        Err(_) => return (StatusCode::UNAUTHORIZED, "Bad token".to_string()),
-    };
 
     let db = app.db.lock().await;
-    let Ok(username) = database::check_password(&db, account_id, &req.password) else {
-        return (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string());
+    let Some(account) = database::find_account(&db, account_id) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            "Account does not exist".to_string(),
+        );
     };
+    let username = account.login;
 
     if !PASSWORD_REGEX.is_match(&req.new_password) {
         return (StatusCode::BAD_REQUEST, "Invalid new password".to_string());
@@ -479,25 +477,25 @@ async fn update_email(
         );
     };
 
-    let account_id =
-        match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
-        {
-            Ok(id) => id.parse::<i64>(),
-            Err(e) => return (StatusCode::UNAUTHORIZED, e),
-        };
-    let account_id = match account_id {
-        Ok(id) => id,
-        Err(_) => return (StatusCode::UNAUTHORIZED, "Bad token".to_string()),
-    };
-
-    let db = app.db.lock().await;
-    let Ok(username) = database::check_password(&db, account_id, &req.password) else {
-        return (StatusCode::UNAUTHORIZED, "Invalid credentials".to_string());
-    };
-
     if !EMAIL_REGEX.is_match(&req.new_email) {
         return (StatusCode::BAD_REQUEST, "Invalid email".to_string());
     }
+
+    let account_id =
+        match util::validate_authed_request(key, &headers, vec![TokenCapability::ManageOwnAccount])
+        {
+            Ok(id) => id.parse::<i64>().unwrap(),
+            Err(e) => return (StatusCode::UNAUTHORIZED, e),
+        };
+
+    let db = app.db.lock().await;
+    let Some(account) = database::find_account(&db, account_id) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            "Account does not exist".to_string(),
+        );
+    };
+    let username = account.login;
 
     let cfg = app.config.account.as_ref().unwrap();
     let verification_kind = EmailVerificationKind::Verify {

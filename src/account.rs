@@ -279,13 +279,9 @@ async fn register_account(
 
     // Email verification is not required, we can create the account immediately
     let account_level = app.config.account.as_ref().unwrap().account_level;
-    if let Err(e) = database::create_account(
-        &db,
-        &req.username,
-        &password_hashed,
-        account_level,
-        req.email.as_deref(),
-    ) {
+    if let Err(e) =
+        database::create_account(&db, &req.username, &password_hashed, account_level, None)
+    {
         error!("Failed to create account: {}", e);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,

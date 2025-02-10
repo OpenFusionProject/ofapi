@@ -1,3 +1,4 @@
+use axum::http::HeaderMap;
 use jsonwebtoken::*;
 use serde::{Deserialize, Serialize};
 
@@ -96,6 +97,31 @@ fn get_validator(account_id: Option<i64>) -> Validation {
     // ensure account ID matches if passed in
     validation.sub = account_id.map(|id| id.to_string());
     validation
+}
+
+pub fn get_jwt_from_request(headers: &HeaderMap) -> Result<String, String> {
+    let auth_header = headers.get("authorization").ok_or("No auth header")?;
+    // auth header uses the Bearer scheme
+    let parts: Vec<&str> = auth_header
+        .to_str()
+        .map_err(|e| e.to_string())?
+        .split(' ')
+        .collect();
+    if parts.len() != 2 || parts[0] != "Bearer" {
+        return Err("Invalid auth header".to_string());
+    }
+    let token = parts[1];
+    Ok(token.to_string())
+}
+
+pub fn get_jwt_issue_time(key: &[u8], jwt: &str) -> Result<u64, String> {
+    let key = DecodingKey::from_secret(key);
+    let validation = get_validator(None);
+    let Ok(token) = jsonwebtoken::decode::<Claims>(jwt, &key, &validation) else {
+        return Err("Bad JWT".to_string());
+    };
+
+    Ok(token.claims.crt)
 }
 
 pub fn validate_jwt(key: &[u8], jwt: &str, caps: Vec<TokenCapability>) -> Result<String, String> {

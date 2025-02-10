@@ -1,3 +1,4 @@
+use jsonwebtoken::get_current_timestamp;
 use log::*;
 use sqlite::{Connection, State};
 
@@ -151,13 +152,16 @@ pub(crate) fn update_password_for_account(
 ) -> Result<(), String> {
     const QUERY: &str = "
         UPDATE Accounts
-        SET Password = ?
+        SET
+            Password = ?,
+            LastPasswordReset = ?
         WHERE Login = ?;
         ";
 
     let mut stmt = db.prepare(QUERY).unwrap();
     stmt.bind((1, password_hashed)).unwrap();
-    stmt.bind((2, username)).unwrap();
+    stmt.bind((2, get_current_timestamp() as i64)).unwrap();
+    stmt.bind((3, username)).unwrap();
     if let Err(e) = stmt.next() {
         return Err(format!("Failed to update password: {}", e));
     }
@@ -255,4 +259,21 @@ pub(crate) fn set_namecheck_for_player(
         return Err(e.to_string());
     }
     Ok(())
+}
+
+pub(crate) fn get_last_password_reset(db: &Connection, account_id: i64) -> Option<u64> {
+    const QUERY: &str = "
+        SELECT LastPasswordReset
+        FROM Accounts
+        WHERE AccountID = ?;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, account_id)).unwrap();
+    stmt.next().ok()?;
+    let ts: i64 = stmt.read(0).unwrap();
+    if ts == 0 {
+        None
+    } else {
+        Some(ts as u64)
+    }
 }

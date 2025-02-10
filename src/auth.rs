@@ -150,7 +150,17 @@ async fn do_refresh(
             ));
         }
     };
-    // TODO validate the refresh token against the last password reset timestamp
+
+    // If the last password reset happened after the token was issued, reject
+    if let Some(last_reset) = database::get_last_password_reset(&db, account_id) {
+        let token_issued = util::get_jwt_issue_time_from_request(key, &headers).unwrap();
+        if last_reset > token_issued {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "Token expired. Please log in again.".to_string(),
+            ));
+        }
+    }
 
     let caps = TokenCapabilities::new()
         .with(TokenCapability::ManageOwnAccount)

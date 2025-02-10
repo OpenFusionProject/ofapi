@@ -40,23 +40,18 @@ pub fn parse_csv(data: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
+pub fn get_jwt_issue_time_from_request(secret: &[u8], headers: &HeaderMap) -> Result<u64, String> {
+    let token = tokens::get_jwt_from_request(headers)?;
+    tokens::get_jwt_issue_time(secret, &token)
+}
+
 pub fn validate_authed_request(
     secret: &[u8],
     headers: &HeaderMap,
     caps: Vec<TokenCapability>,
 ) -> Result<String, String> {
-    let auth_header = headers.get("authorization").ok_or("No auth header")?;
-    // auth header uses the Bearer scheme
-    let parts: Vec<&str> = auth_header
-        .to_str()
-        .map_err(|e| e.to_string())?
-        .split(' ')
-        .collect();
-    if parts.len() != 2 || parts[0] != "Bearer" {
-        return Err("Invalid auth header".to_string());
-    }
-    let token = parts[1];
-    tokens::validate_jwt(secret, token, caps)
+    let token = tokens::get_jwt_from_request(headers)?;
+    tokens::validate_jwt(secret, &token, caps)
 }
 
 pub fn gen_random_string(len: usize, rng: &SystemRandom) -> String {

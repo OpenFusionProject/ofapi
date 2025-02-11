@@ -55,11 +55,34 @@ cargo build --release
 |            | /account/update/password | POST   | Yes    | Update the password for an account |
 |            | /account/update/email    | POST   | Yes    | Update the email for an account |
 | auth       | /auth                    | POST   | No     | Obtain a refresh token for an account |
-|            | /auth/session            | POST   | Yes    | Obtain a session token for an account |
+|            | /auth/session            | POST   | Yes*   | Obtain a session token for an account |
 | cookie     | /cookie                  | POST   | Yes    | Obtain an OpenFusion login cookie for an account |
 | legacy     | /index.html              | GET    | No     | Get an index.html file for legacy client use |
 |            | /assetInfo.php           | GET    | No     | Get an assetInfo.php file for legacy client use |
 |            | /loginInfo.php           | GET    | No     | Get a loginInfo.php file for legacy client use |
 | static     | /*                       | GET    | No     | See `statics.csv`
 
+\*Auth by refresh token instead of session token
+
 Technical documentation on each API is WIP and will be on the GitHub wiki.
+
+## Authentication
+ofapi uses capability-based [JSON Web Tokens ("jwt")](https://jwt.io/) for authentication.
+A secret key is generated on first startup (see the config for the `auth` module) and is used for token signing.
+All tokens can be invalidated by deleting and regenerating the secret file. **Do not share this file with anyone.**
+
+### Refresh Tokens
+Refresh tokens are used to generate new session tokens. They should be long-lived and cached by clients, and are invalidated upon password changes. Refresh tokens have a single capability: acquiring a session token.
+
+### Session Tokens
+Session tokens are multi-capable and can access most authed module APIs, with the exception of those requiring extra capabilities (such as the moderation APIs). They should be very short-lived and reacquired using a refresh token.
+
+### Service Tokens
+Service tokens are special tokens that are manually created using the `gen_token` binary in the Cargo project. The lifespan and capabilities of service tokens are completely customizable and are meant to be used by external services such as [Discord bots](https://github.com/OpenFusionProject/computress-rs).
+
+#### Generation
+You can run `gen_token` with Cargo like so:
+```
+cargo run --bin=gen_token
+```
+An interactive prompt will guide you through the token creation process.

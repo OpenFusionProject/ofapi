@@ -1,6 +1,6 @@
 use jsonwebtoken::get_current_timestamp;
 use log::*;
-use sqlite::{Connection, State};
+use sqlite::{Connection, OpenFlags, State};
 
 use crate::moderation::NameCheckStatus;
 
@@ -25,7 +25,14 @@ pub(crate) fn connect_to_db(path: &str) -> Connection {
     }
 
     // open the database and check the meta table
-    let conn = sqlite::open(path).expect("Failed to open DB");
+    let conn = Connection::open_with_flags(
+        path,
+        OpenFlags::new()
+            .with_create()
+            .with_read_write()
+            .with_full_mutex(),
+    )
+    .expect("Failed to open DB");
     let mut stmt = conn.prepare(QUERY).unwrap();
     let Ok(State::Row) = stmt.next() else {
         panic!("Could not validate database: {}", path);

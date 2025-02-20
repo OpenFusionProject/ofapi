@@ -4,7 +4,7 @@ ofapi is an API server that provides RESTful web APIs to enhance [OpenFusion](ht
 
 ofapi groups available APIs into modules. Each module has a corresponding table in the config file (`config.toml`) and can be deactivated by commenting out the table (with the exception of the `core` and `game` modules, which are required).
 
-Many APIs are "secure", meaning they must be accessed by the TLS port bound to by the application. TLS can be applied at the application level by compiling with the `tls` [feature](https://doc.rust-lang.org/cargo/reference/features.html) or by a proxy server such as [nginx](https://nginx.org/). **Please verify that secure APIs are only accessible through TLS before deploying ofapi on a publicly accessible network.**
+Some modules are "secure", meaning their APIs must be accessed by the TLS port bound to by the application. TLS can be applied at the application level by compiling with the `tls` [feature](https://doc.rust-lang.org/cargo/reference/features.html) or by a proxy server such as [nginx](https://nginx.org/). **Please verify that secure APIs are only accessible through TLS before deploying ofapi on a publicly accessible network.**
 
 ofapi requires an OpenFusion sqlite database of version 6 or higher.
 
@@ -21,22 +21,20 @@ cargo build --release
 ```
 
 ## Modules & APIs
-### Available Modules
-
-| Module     | Description | Required |
-|------------|-------------|----------|
-| core       | Core functionality of the API server | Yes |
-| tls        | TLS configuration for secure APIs | No* |
-| email      | SMTP configuration for sending emails | No |
-| game       | Game version and login address info | Yes |
-| monitor    | Real-time game data | No |
-| moderation | Game moderation tools, such as name requests | No |
-| rankinfo   | Infected Zone race ranking info | No* |
-| account    | User account management APIs | No |
-| auth       | Authentication and authorization APIs | No* |
-| cookie     | Secure game login | No* |
-| legacy     | Compatibility with legacy, file-based clients | No |
-| static     | Static resource serving | N/A |
+| Module     | Required | Secure | Description |
+|------------|----------|--------|-------------|
+| core       | Yes      | No     | Core functionality of the API server |
+| tls        | No*      | N/A    | TLS configuration for secure APIs |
+| email      | No       | N/A    | SMTP configuration for sending emails |
+| game       | Yes      | No     | Game version and login address info |
+| monitor    | No       | No     | Real-time game data |
+| moderation | No       | Yes    | Game moderation tools, such as name requests |
+| rankinfo   | No*      | No     | Infected Zone race ranking info |
+| account    | No       | Yes    | User account management APIs |
+| auth       | No*      | Yes    | Authentication and authorization APIs |
+| cookie     | No*      | Yes    | Secure game login |
+| legacy     | No       | No     | Compatibility with legacy, file-based clients |
+| static     | N/A      | No     | Static resource serving |
 
 \*Module highly recommended
 
@@ -65,6 +63,10 @@ cargo build --release
 \*Auth by refresh token instead of session token
 
 Technical documentation on each API is WIP and will be on the GitHub wiki.
+
+## Static Resources
+Static files and directories can be easily served by mapping them to an endpoint in the `statics.csv` file.
+These are accessible from both HTTP and HTTPS. Some common mappings are included as defaults.
 
 ## Authentication
 ofapi uses capability-based [JSON Web Tokens ("jwt")](https://jwt.io/) for authentication.

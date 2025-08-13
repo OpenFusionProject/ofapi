@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, net::IpAddr, sync::Arc};
 
 use ::ring::rand::SystemRandom;
 use axum::{extract::State, routing::get, Json, Router};
@@ -32,6 +32,7 @@ struct CoreConfig {
     public_url: String,
     db_path: String,
     template_dir: String,
+    bind_ip: String,
     port: Option<u16>,
 }
 
@@ -162,11 +163,11 @@ async fn main() {
     let _ = tokio::join!(http, https);
 }
 
-const BIND_IP: [u8; 4] = [127, 0, 0, 1];
-
 async fn init_http(routes: Router<Arc<AppState>>, config: &Config, state: AppState) {
     const DEFAULT_HTTP_PORT: u16 = 80;
-    let addr = SocketAddr::from((BIND_IP, config.core.port.unwrap_or(DEFAULT_HTTP_PORT)));
+    let addr = SocketAddr::from((
+        config.core.bind_ip.parse::<IpAddr>().expect("Failed to parse bind_ip"),
+        config.core.port.unwrap_or(DEFAULT_HTTP_PORT)));
 
     let app = routes.with_state(Arc::new(state));
 
@@ -186,7 +187,9 @@ async fn init_https(routes: Router<Arc<AppState>>, config: &Config, mut state: A
         return;
     };
 
-    let addr = SocketAddr::from((BIND_IP, tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT)));
+    let addr = SocketAddr::from((
+        config.core.bind_ip.parse::<IpAddr>().expect("Failed to parse bind_ip"),
+        tls_config.port.unwrap_or(DEFAULT_HTTPS_PORT)));
 
     #[cfg(not(feature = "tls"))]
     {

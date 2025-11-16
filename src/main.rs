@@ -5,9 +5,10 @@ use axum::{extract::State, routing::get, Json, Router};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
-use sqlite::Connection;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
+
+use crate::database::DatabaseConnection;
 
 #[cfg(feature = "tls")]
 use {axum_server::tls_rustls::RustlsConfig, rustls::crypto::ring};
@@ -30,7 +31,12 @@ mod email;
 struct CoreConfig {
     server_name: String,
     public_url: String,
-    db_path: String,
+    db_type: String,
+    db_path: Option<String>,
+    db_username: Option<String>,
+    db_password: Option<String>,
+    db_host: Option<String>,
+    db_port: Option<u16>,
     template_dir: String,
     port: Option<u16>,
 }
@@ -74,7 +80,7 @@ impl Config {
 
 #[derive(Clone)]
 struct AppState {
-    db: Arc<Mutex<Connection>>,
+    db: Arc<Mutex<DatabaseConnection>>,
     rng: Arc<SystemRandom>,
     email_verifications: Arc<Mutex<HashMap<String, email::EmailVerification>>>,
     temp_passwords: Arc<Mutex<HashMap<String, email::TempPassword>>>,
@@ -87,7 +93,7 @@ impl AppState {
             "SQLite version {}",
             util::version_to_string(sqlite::version())
         );
-        let conn = database::connect_to_db(&config.core.db_path);
+        let conn = database::connect_to_db(&config.core);
         Self {
             db: Arc::new(Mutex::new(conn)),
             rng: Arc::new(SystemRandom::new()),
@@ -242,7 +248,7 @@ async fn get_info(State(state): State<Arc<AppState>>) -> Json<InfoResponse> {
             .config
             .account
             .as_ref()
-            .map_or(false, |a| a.is_email_required()),
+            .is_some_and(|a| a.is_email_required()),
         custom_loading_screen: state.config.game.custom_loading_screen.unwrap_or(false),
     };
     Json(info)

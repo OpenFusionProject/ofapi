@@ -1,7 +1,12 @@
 [core]
 server_name = "My OpenFusion Server"
 public_url = "api.example.xyz"
-db_path = "../OpenFusion/database.db"
+db_type = "sqlite" # "sqlite" or "postgres"
+db_path = "../OpenFusion/database.db" # sqlite only
+#db_username = "admin" # postgres only
+#db_password = "mypassword" # postgres only
+#db_host = "localhost" # postgres only
+#db_port = 5432 # postgres only
 template_dir = "./templates"
 port = 8888
 

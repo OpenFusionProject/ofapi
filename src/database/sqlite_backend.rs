@@ -2,18 +2,11 @@ use jsonwebtoken::get_current_timestamp;
 use log::*;
 use sqlite::{Connection, OpenFlags, State};
 
-use crate::moderation::NameCheckStatus;
-
-const MIN_DATABASE_VERSION: i64 = 6;
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub(crate) struct Account {
-    pub(crate) id: i64,
-    pub(crate) login: String,
-    pub(crate) password_hashed: String,
-    pub(crate) email: String,
-}
+use crate::{
+    database::{Account, MIN_DATABASE_VERSION},
+    moderation::NameCheckStatus,
+    rankinfo::Rank,
+};
 
 pub(crate) fn connect_to_db(path: &str) -> Connection {
     const QUERY: &str = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Meta';";
@@ -283,4 +276,110 @@ pub(crate) fn get_last_password_reset(db: &Connection, account_id: i64) -> Optio
     } else {
         Some(ts as u64)
     }
+}
+
+pub(crate) fn fetch_ranks(
+    db: &Connection,
+    epid: i64,
+    date: &str,
+    num: usize,
+    fill: bool,
+) -> Vec<Rank> {
+    const QUERY: &str = "
+        SELECT
+            PBRaceResults.PlayerID,
+            Players.FirstName,
+            Players.LastName,
+            PBRaceResults.Score
+        FROM (
+            SELECT
+                ROW_NUMBER() OVER (
+                    PARTITION BY RaceResults.PlayerID
+                    ORDER BY
+                        RaceResults.Score DESC,
+                        RaceResults.RingCount DESC,
+                        RaceResults.Time ASC
+                ) AS PersonalOrder,
+                RaceResults.*
+            FROM RaceResults
+            WHERE EPID=? AND DATETIME(Timestamp, 'unixepoch') > DATETIME('now', ?)
+        ) AS PBRaceResults
+        INNER JOIN Players ON PBRaceResults.PlayerID=Players.PlayerID AND PBRaceResults.PersonalOrder=1
+        ORDER BY
+            PBRaceResults.Score DESC,
+            PBRaceResults.RingCount DESC,
+            PBRaceResults.Time ASC;
+    ";
+
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, epid)).unwrap();
+    stmt.bind((2, date)).unwrap();
+    db_parse_ranks(stmt, num, fill)
+}
+
+pub(crate) fn fetch_my_ranks(db: &Connection, pcuid: i64, epid: i64, date: &str) -> Vec<Rank> {
+    const QUERY: &str = "
+        SELECT
+            RaceResults.PlayerID,
+            Players.FirstName,
+            Players.LastName,
+            RaceResults.Score
+        FROM RaceResults
+        INNER JOIN Players ON RaceResults.PlayerID=Players.PlayerID
+        WHERE RaceResults.PlayerID=? AND EPID=? AND DATETIME(Timestamp, 'unixepoch') > DATETIME('now', ?)
+        ORDER BY RaceResults.Score DESC
+        LIMIT 1;
+    ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, pcuid)).unwrap();
+    stmt.bind((2, epid)).unwrap();
+    stmt.bind((3, date)).unwrap();
+    db_parse_ranks(stmt, 1, false)
+}
+
+pub(crate) fn set_cookie(
+    db: &Connection,
+    account_id: i64,
+    cookie: &str,
+    valid_secs: u64,
+) -> Result<u64, String> {
+    const QUERY: &str =
+        "INSERT OR REPLACE INTO Auth (AccountID, Cookie, Expires) VALUES (?, ?, ?);";
+
+    let expires_timestamp = get_current_timestamp() + valid_secs;
+
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, account_id)).unwrap();
+    stmt.bind((2, cookie)).unwrap();
+    stmt.bind((3, expires_timestamp as i64)).unwrap();
+    if let Err(e) = stmt.next() {
+        return Err(format!("Failed to set cookie: {}", e));
+    }
+    Ok(expires_timestamp)
+}
+
+fn db_parse_ranks(mut stmt: sqlite::Statement, num: usize, fill: bool) -> Vec<Rank> {
+    let mut ranks = Vec::with_capacity(num);
+    while let Ok(sqlite::State::Row) = stmt.next() {
+        if ranks.len() >= num {
+            break;
+        }
+        let pcuid = stmt.read::<i64, _>("PlayerID").unwrap();
+        let first_name = stmt.read::<String, _>("FirstName").unwrap();
+        let last_name = stmt.read::<String, _>("LastName").unwrap();
+        let score = stmt.read::<i64, _>("Score").unwrap();
+        ranks.push(Rank {
+            pcuid,
+            score,
+            first_name,
+            last_name,
+        });
+    }
+
+    if fill {
+        while ranks.len() < num {
+            ranks.push(Rank::new_placeholder());
+        }
+    }
+    ranks
 }

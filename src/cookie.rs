@@ -7,12 +7,10 @@ use axum::{
     Json, Router,
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
-use jsonwebtoken::get_current_timestamp;
 use log::*;
 use ofapi::tokens::TokenCapability;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
-use sqlite::Connection;
 
 use crate::{auth, database, util, AppState};
 
@@ -46,25 +44,6 @@ fn gen_cookie(rng: &SystemRandom) -> String {
     let cookie = BASE64_STANDARD.encode(cookie_bytes);
     assert!(cookie.len() == COOKIE_LENGTH);
     cookie
-}
-
-fn set_cookie(
-    db: &Connection,
-    account_id: i64,
-    cookie: &str,
-    valid_secs: u64,
-) -> Result<u64, sqlite::Error> {
-    const QUERY: &str =
-        "INSERT OR REPLACE INTO Auth (AccountID, Cookie, Expires) VALUES (?, ?, ?);";
-
-    let expires_timestamp = get_current_timestamp() + valid_secs;
-
-    let mut stmt = db.prepare(QUERY)?;
-    stmt.bind((1, account_id)).unwrap();
-    stmt.bind((2, cookie)).unwrap();
-    stmt.bind((3, expires_timestamp as i64)).unwrap();
-    stmt.next()?;
-    Ok(expires_timestamp)
 }
 
 async fn get_cookie(
@@ -106,7 +85,7 @@ async fn get_cookie(
         }
     };
 
-    let expires = set_cookie(&db, account_id, &cookie, valid_secs).map_err(|_| {
+    let expires = database::set_cookie(&db, account_id, &cookie, valid_secs).map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Server error".to_string(),

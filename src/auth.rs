@@ -88,8 +88,9 @@ async fn do_auth(
 
     // Check credentials with the database
     if account_id.is_none() {
-        let db = app.db.lock().await;
-        account_id = database::check_credentials(&db, &req.username, &req.password).ok();
+        account_id = database::check_credentials(&app.db, &req.username, &req.password)
+            .await
+            .ok();
     }
 
     // Still no auth
@@ -139,8 +140,7 @@ async fn do_refresh(
         Err(_) => return Err((StatusCode::UNAUTHORIZED, "Bad token".to_string())),
     };
 
-    let db = app.db.lock().await;
-    let username = match database::find_account(&db, account_id) {
+    let username = match database::find_account(&app.db, account_id).await {
         Some(a) => a.login,
         None => {
             warn!("Account not found: {} (refresh)", account_id);
@@ -152,7 +152,7 @@ async fn do_refresh(
     };
 
     // If the last password reset happened after the token was issued, reject
-    if let Some(last_reset) = database::get_last_password_reset(&db, account_id) {
+    if let Some(last_reset) = database::get_last_password_reset(&app.db, account_id).await {
         let token_issued = util::get_jwt_issue_time_from_request(key, &headers).unwrap();
         if last_reset > token_issued {
             return Err((

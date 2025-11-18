@@ -203,8 +203,7 @@ pub(crate) async fn send_temp_password_email(
 ) -> Result<bool, String> {
     // Find the account with the given email
     let account = {
-        let db = app.db.lock().await;
-        match database::find_account_by_email(&db, email) {
+        match database::find_account_by_email(&app.db, email).await {
             Some(acc) => acc,
             None => return Ok(false),
         }

@@ -74,8 +74,7 @@ async fn get_cookie(
     let cookie = gen_cookie(&app.rng);
     let valid_secs = app.config.cookie.as_ref().unwrap().valid_secs;
 
-    let db = app.db.lock().await;
-    let username = match database::find_account(&db, account_id) {
+    let username = match database::find_account(&app.db, account_id).await {
         Some(a) => a.login,
         None => {
             return Err((
@@ -85,12 +84,14 @@ async fn get_cookie(
         }
     };
 
-    let expires = database::set_cookie(&db, account_id, &cookie, valid_secs).map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Server error".to_string(),
-        )
-    })?;
+    let expires = database::set_cookie(&app.db, account_id, &cookie, valid_secs)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error".to_string(),
+            )
+        })?;
 
     Ok(Json(CookieResponse {
         username,

@@ -75,8 +75,8 @@ async fn get_outstanding_requests(
         return (StatusCode::UNAUTHORIZED, Json(vec![]));
     }
 
-    let db = app.db.lock().await;
-    let requests = database::get_outstanding_namereqs(&db)
+    let requests = database::get_outstanding_namereqs(&app.db)
+        .await
         .into_iter()
         .map(|(uid, name)| NameRequest {
             player_uid: uid as u64,
@@ -117,8 +117,7 @@ async fn name_request(
         req.player_uid, req.requested_name, req.decision, req.by
     );
 
-    let db = app.db.lock().await;
-    match database::get_namecheck_for_player(&db, req.player_uid as i64) {
+    match database::get_namecheck_for_player(&app.db, req.player_uid as i64).await {
         Err(e) => {
             warn!(
                 "Failed to get name check flag for player {}: {}",
@@ -144,7 +143,9 @@ async fn name_request(
         }
     }
 
-    if let Err(e) = database::set_namecheck_for_player(&db, req.player_uid as i64, new_status) {
+    if let Err(e) =
+        database::set_namecheck_for_player(&app.db, req.player_uid as i64, new_status).await
+    {
         warn!(
             "Failed to update name check flag for player {}: {}",
             req.player_uid, e

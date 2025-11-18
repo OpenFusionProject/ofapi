@@ -92,15 +92,13 @@ async fn get_ranks(
     const DEFAULT_NUM: usize = 10;
 
     debug!("Rank info request: {:?}", req);
-    let db = state.db.lock().await;
-
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", "text/html; charset=utf-8".parse().unwrap());
 
     let mut body = String::new();
     for (name, date) in DATE_RANGES.iter() {
         // my ranks
-        let my_ranks = database::fetch_my_ranks(&db, req.pcuid, req.epid, date);
+        let my_ranks = database::fetch_my_ranks(&state.db, req.pcuid, req.epid, date).await;
         let xml_my_scores = ranks_to_xml_scores(my_ranks);
         let xml_my_scores_str = xml_my_scores.join("\n");
         let xml_my = util::wrap_xml(&format!("my{}", name), &xml_my_scores_str, true);
@@ -108,8 +106,14 @@ async fn get_ranks(
 
         // all ranks
         let fill = state.config.rankinfo.as_ref().unwrap().placeholders;
-        let ranks =
-            database::fetch_ranks(&db, req.epid, date, req.num.unwrap_or(DEFAULT_NUM), fill);
+        let ranks = database::fetch_ranks(
+            &state.db,
+            req.epid,
+            date,
+            req.num.unwrap_or(DEFAULT_NUM),
+            fill,
+        )
+        .await;
         let xml_scores = ranks_to_xml_scores(ranks);
         let xml_scores_str = xml_scores.join("\n");
         let xml = util::wrap_xml(name, &xml_scores_str, true);

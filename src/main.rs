@@ -81,7 +81,7 @@ impl Config {
 
 #[derive(Clone)]
 struct AppState {
-    db: Arc<Mutex<DatabaseConnection>>,
+    db: Arc<DatabaseConnection>,
     rng: Arc<SystemRandom>,
     email_verifications: Arc<Mutex<HashMap<String, email::EmailVerification>>>,
     temp_passwords: Arc<Mutex<HashMap<String, email::TempPassword>>>,
@@ -89,14 +89,10 @@ struct AppState {
     config: Config,
 }
 impl AppState {
-    fn new(config: &Config) -> Self {
-        info!(
-            "SQLite version {}",
-            util::version_to_string(sqlite::version())
-        );
-        let conn = database::connect_to_db(&config.core);
+    async fn new(config: &Config) -> Self {
+        let conn = database::connect_to_db(&config.core).await;
         Self {
-            db: Arc::new(Mutex::new(conn)),
+            db: Arc::new(conn),
             rng: Arc::new(SystemRandom::new()),
             email_verifications: Arc::new(Mutex::new(HashMap::new())),
             temp_passwords: Arc::new(Mutex::new(HashMap::new())),
@@ -123,7 +119,7 @@ async fn main() {
     info!("OFAPI v{}", env!("CARGO_PKG_VERSION"));
 
     // init app state
-    let state = AppState::new(&config);
+    let state = AppState::new(&config).await;
 
     // register endpoints for both HTTP and HTTPS
     let mut routes = Router::new().route("/", get(get_info));

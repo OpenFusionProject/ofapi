@@ -1,6 +1,7 @@
 use jsonwebtoken::get_current_timestamp;
 use log::*;
-use sqlite::{Connection, OpenFlags, State};
+use ofapi::util;
+use sqlite::{Connection, ConnectionThreadSafe, State};
 
 use crate::{
     database::{Account, MIN_DATABASE_VERSION},
@@ -8,9 +9,14 @@ use crate::{
     rankinfo::Rank,
 };
 
-pub(crate) fn connect_to_db(path: &str) -> Connection {
+pub(crate) fn connect_to_db(path: &str) -> ConnectionThreadSafe {
     const QUERY: &str = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Meta';";
     const VERSION_QUERY: &str = "SELECT Value FROM Meta WHERE Key = 'DatabaseVersion';";
+
+    info!(
+        "SQLite version {}",
+        util::version_to_string(sqlite::version())
+    );
 
     // check if the db exists first
     if !std::path::Path::new(path).exists() {
@@ -18,14 +24,7 @@ pub(crate) fn connect_to_db(path: &str) -> Connection {
     }
 
     // open the database and check the meta table
-    let conn = Connection::open_with_flags(
-        path,
-        OpenFlags::new()
-            .with_create()
-            .with_read_write()
-            .with_full_mutex(),
-    )
-    .expect("Failed to open DB");
+    let conn = Connection::open_thread_safe(path).expect("Failed to open DB");
     let mut stmt = conn.prepare(QUERY).unwrap();
     let Ok(State::Row) = stmt.next() else {
         panic!("Could not validate database: {}", path);

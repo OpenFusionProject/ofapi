@@ -156,8 +156,7 @@ async fn get_account_info(
             Err(e) => return Err((StatusCode::UNAUTHORIZED, e)),
         };
 
-    let db = app.db.lock().await;
-    let Some(account) = database::find_account(&db, account_id) else {
+    let Some(account) = database::find_account(&app.db, account_id).await else {
         // account should definitely exist
         error!("Account for authed user not found: {}", account_id);
         return Err((
@@ -182,8 +181,6 @@ async fn register_account(
     Json(req): Json<RegisterRequest>,
 ) -> (StatusCode, String) {
     assert!(app.is_tls);
-    let db = app.db.lock().await;
-
     let cfg = app.config.account.as_ref().unwrap();
 
     // Validate username, password, and email
@@ -205,7 +202,10 @@ async fn register_account(
     }
 
     // Make sure the username and email aren't already in use
-    if database::find_account_by_username(&db, &req.username).is_some() {
+    if database::find_account_by_username(&app.db, &req.username)
+        .await
+        .is_some()
+    {
         info!("Username already in use: {}", req.username);
         return (
             StatusCode::BAD_REQUEST,
@@ -214,7 +214,10 @@ async fn register_account(
     }
 
     if let Some(ref email) = req.email {
-        if database::find_account_by_email(&db, email).is_some() {
+        if database::find_account_by_email(&app.db, email)
+            .await
+            .is_some()
+        {
             info!("Email already in use: {}", email);
             return (StatusCode::BAD_REQUEST, "Email already in use".to_string());
         }
@@ -279,8 +282,14 @@ async fn register_account(
 
     // Email verification is not required, we can create the account immediately
     let account_level = app.config.account.as_ref().unwrap().account_level;
-    if let Err(e) =
-        database::create_account(&db, &req.username, &password_hashed, account_level, None)
+    if let Err(e) = database::create_account(
+        &app.db,
+        &req.username,
+        &password_hashed,
+        account_level,
+        None,
+    )
+    .await
     {
         error!("Failed to create account: {}", e);
         return (
@@ -357,7 +366,6 @@ async fn verify_email(
         );
     }
 
-    let db = app.db.lock().await;
     let username = match verification.kind {
         EmailVerificationKind::Register {
             ref username,
@@ -365,12 +373,14 @@ async fn verify_email(
         } => {
             let account_level = app.config.account.as_ref().unwrap().account_level;
             if let Err(e) = database::create_account(
-                &db,
+                &app.db,
                 username,
                 password_hashed,
                 account_level,
                 Some(&verification.email),
-            ) {
+            )
+            .await
+            {
                 error!("Failed to create account: {}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -380,7 +390,9 @@ async fn verify_email(
             username.clone()
         }
         EmailVerificationKind::Verify { ref username } => {
-            if let Err(e) = database::update_email_for_account(&db, username, &verification.email) {
+            if let Err(e) =
+                database::update_email_for_account(&app.db, username, &verification.email).await
+            {
                 error!("Failed to update email for user {}: {}", username, e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -426,8 +438,7 @@ async fn update_password(
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };
 
-    let db = app.db.lock().await;
-    let Some(account) = database::find_account(&db, account_id) else {
+    let Some(account) = database::find_account(&app.db, account_id).await else {
         return (
             StatusCode::UNAUTHORIZED,
             "Account does not exist".to_string(),
@@ -450,7 +461,9 @@ async fn update_password(
         }
     };
 
-    if let Err(e) = database::update_password_for_account(&db, &username, &new_password_hashed) {
+    if let Err(e) =
+        database::update_password_for_account(&app.db, &username, &new_password_hashed).await
+    {
         error!("Failed to update password: {}", e);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -486,8 +499,7 @@ async fn update_email(
             Err(e) => return (StatusCode::UNAUTHORIZED, e),
         };
 
-    let db = app.db.lock().await;
-    let Some(account) = database::find_account(&db, account_id) else {
+    let Some(account) = database::find_account(&app.db, account_id).await else {
         return (
             StatusCode::UNAUTHORIZED,
             "Account does not exist".to_string(),

@@ -1,5 +1,4 @@
 use crate::{moderation::NameCheckStatus, rankinfo::Rank, CoreConfig};
-use sqlite::Connection;
 
 mod sqlite_backend;
 
@@ -15,11 +14,11 @@ pub(crate) struct Account {
 }
 
 pub(crate) enum DatabaseConnection {
-    Sqlite(Connection),
+    Sqlite(sqlite::ConnectionThreadSafe),
     // Postgres(PostgresConnection),
 }
 
-pub fn connect_to_db(config: &CoreConfig) -> DatabaseConnection {
+pub async fn connect_to_db(config: &CoreConfig) -> DatabaseConnection {
     match config.db_type.as_str() {
         "sqlite" => {
             let path = config
@@ -53,14 +52,17 @@ pub fn connect_to_db(config: &CoreConfig) -> DatabaseConnection {
     }
 }
 
-pub(crate) fn find_account(db: &DatabaseConnection, account_id: i64) -> Option<Account> {
+pub(crate) async fn find_account(db: &DatabaseConnection, account_id: i64) -> Option<Account> {
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::find_account(conn, account_id),
         //DatabaseConnection::Postgres(conn) => postgres_backend::find_account(conn, account_id),
     }
 }
 
-pub(crate) fn find_account_by_username(db: &DatabaseConnection, username: &str) -> Option<Account> {
+pub(crate) async fn find_account_by_username(
+    db: &DatabaseConnection,
+    username: &str,
+) -> Option<Account> {
     match db {
         DatabaseConnection::Sqlite(conn) => {
             sqlite_backend::find_account_by_username(conn, username)
@@ -69,14 +71,14 @@ pub(crate) fn find_account_by_username(db: &DatabaseConnection, username: &str) 
     }
 }
 
-pub(crate) fn find_account_by_email(db: &DatabaseConnection, email: &str) -> Option<Account> {
+pub(crate) async fn find_account_by_email(db: &DatabaseConnection, email: &str) -> Option<Account> {
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::find_account_by_email(conn, email),
         //DatabaseConnection::Postgres(conn) => postgres_backend::find_account_by_email(conn, email),
     }
 }
 
-pub(crate) fn create_account(
+pub(crate) async fn create_account(
     db: &DatabaseConnection,
     username: &str,
     password_hashed: &str,
@@ -92,7 +94,7 @@ pub(crate) fn create_account(
     }
 }
 
-pub(crate) fn update_password_for_account(
+pub(crate) async fn update_password_for_account(
     db: &DatabaseConnection,
     username: &str,
     password_hashed: &str,
@@ -106,7 +108,7 @@ pub(crate) fn update_password_for_account(
     }
 }
 
-pub(crate) fn update_email_for_account(
+pub(crate) async fn update_email_for_account(
     db: &DatabaseConnection,
     username: &str,
     email: &str,
@@ -120,7 +122,7 @@ pub(crate) fn update_email_for_account(
     }
 }
 
-pub(crate) fn check_credentials(
+pub(crate) async fn check_credentials(
     db: &DatabaseConnection,
     username: &str,
     password: &str,
@@ -134,7 +136,7 @@ pub(crate) fn check_credentials(
     }
 }
 
-pub(crate) fn get_outstanding_namereqs(db: &DatabaseConnection) -> Vec<(i64, String)> {
+pub(crate) async fn get_outstanding_namereqs(db: &DatabaseConnection) -> Vec<(i64, String)> {
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::get_outstanding_namereqs(conn), //DatabaseConnection::Postgres(conn) => {
                                                                                             //    postgres_backend::get_outstanding_namereqs(conn)
@@ -142,7 +144,7 @@ pub(crate) fn get_outstanding_namereqs(db: &DatabaseConnection) -> Vec<(i64, Str
     }
 }
 
-pub(crate) fn get_namecheck_for_player(
+pub(crate) async fn get_namecheck_for_player(
     db: &DatabaseConnection,
     player_uid: i64,
 ) -> Result<i64, String> {
@@ -155,7 +157,7 @@ pub(crate) fn get_namecheck_for_player(
     }
 }
 
-pub(crate) fn set_namecheck_for_player(
+pub(crate) async fn set_namecheck_for_player(
     db: &DatabaseConnection,
     player_uid: i64,
     name_check_status: NameCheckStatus,
@@ -169,7 +171,10 @@ pub(crate) fn set_namecheck_for_player(
     }
 }
 
-pub(crate) fn get_last_password_reset(db: &DatabaseConnection, account_id: i64) -> Option<u64> {
+pub(crate) async fn get_last_password_reset(
+    db: &DatabaseConnection,
+    account_id: i64,
+) -> Option<u64> {
     match db {
         DatabaseConnection::Sqlite(conn) => {
             sqlite_backend::get_last_password_reset(conn, account_id)
@@ -179,7 +184,7 @@ pub(crate) fn get_last_password_reset(db: &DatabaseConnection, account_id: i64) 
     }
 }
 
-pub(crate) fn fetch_ranks(
+pub(crate) async fn fetch_ranks(
     db: &DatabaseConnection,
     epid: i64,
     date: &str,
@@ -195,7 +200,7 @@ pub(crate) fn fetch_ranks(
     }
 }
 
-pub(crate) fn fetch_my_ranks(
+pub(crate) async fn fetch_my_ranks(
     db: &DatabaseConnection,
     pcuid: i64,
     epid: i64,
@@ -208,7 +213,7 @@ pub(crate) fn fetch_my_ranks(
     }
 }
 
-pub(crate) fn set_cookie(
+pub(crate) async fn set_cookie(
     db: &DatabaseConnection,
     account_id: i64,
     cookie: &str,

@@ -37,6 +37,7 @@ struct CoreConfig {
     db_password: Option<String>,
     db_host: Option<String>,
     db_port: Option<u16>,
+    db_name: Option<String>,
     template_dir: String,
     port: Option<u16>,
 }

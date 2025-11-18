@@ -7,6 +7,7 @@ db_path = "../OpenFusion/database.db" # sqlite only
 #db_password = "mypassword" # postgres only
 #db_host = "localhost" # postgres only
 #db_port = 5432 # postgres only
+#db_name = "openfusion" # postgres only
 template_dir = "./templates"
 port = 8888
 

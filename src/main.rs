@@ -73,8 +73,18 @@ struct Config {
 }
 impl Config {
     fn load() -> Self {
+        const DEFAULT_CONFIG: &str = include_str!("../config.toml.default");
         const CONFIG_PATH: &str = "config.toml";
-        let config = std::fs::read_to_string(CONFIG_PATH).expect("Failed to open config file");
+        let config = match std::fs::read_to_string(CONFIG_PATH) {
+            Ok(c) => c,
+            Err(_) => {
+                warn!(
+                    "Failed to read config file at {}. Loading default config.",
+                    CONFIG_PATH
+                );
+                DEFAULT_CONFIG.to_string()
+            }
+        };
         toml::from_str(&config).expect("Failed to parse config file")
     }
 }
@@ -104,9 +114,6 @@ impl AppState {
 
 #[tokio::main]
 async fn main() {
-    // load config
-    let config = Config::load();
-
     // init logging
     TermLogger::init(
         LevelFilter::Info,
@@ -117,6 +124,9 @@ async fn main() {
     .expect("Failed to init logger");
 
     info!("OFAPI v{}", env!("CARGO_PKG_VERSION"));
+
+    // load config
+    let config = Config::load();
 
     // init app state
     let state = AppState::new(&config).await;

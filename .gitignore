@@ -4,4 +4,6 @@
 
 *.db
 *.pem
+
+config.toml
 secret

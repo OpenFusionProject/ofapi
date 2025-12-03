@@ -61,15 +61,30 @@ pub async fn connect_to_db(config: &CoreConfig) -> DatabaseConnection {
     }
 }
 
+pub(crate) async fn check_credentials(
+    db: &DatabaseConnection,
+    username: &str,
+    password: &str,
+) -> Result<i64, String> {
+    let account = find_account_by_username(db, username)
+        .await
+        .ok_or("Account not found")?;
+    match bcrypt::verify(password, &account.password_hashed) {
+        Ok(true) => Ok(account.id),
+        Ok(false) => Err("Invalid password".to_string()),
+        Err(e) => Err(format!("bcrypt error: {}", e)),
+    }
+}
+
 pub(crate) async fn find_account(db: &DatabaseConnection, account_id: i64) -> Option<Account> {
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::find_account(conn, account_id),
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return None;
             };
-            unimplemented!();
+            postgres_backend::find_account(&client, account_id).await
         }
     }
 }
@@ -83,11 +98,11 @@ pub(crate) async fn find_account_by_username(
             sqlite_backend::find_account_by_username(conn, username)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return None;
             };
-            unimplemented!();
+            postgres_backend::find_account_by_username(&client, username).await
         }
     }
 }
@@ -96,11 +111,11 @@ pub(crate) async fn find_account_by_email(db: &DatabaseConnection, email: &str) 
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::find_account_by_email(conn, email),
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return None;
             };
-            unimplemented!();
+            postgres_backend::find_account_by_email(&client, email).await
         }
     }
 }
@@ -117,13 +132,23 @@ pub(crate) async fn create_account(
             sqlite_backend::create_account(conn, username, password_hashed, account_level, email)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return Err(DB_ERROR_TEXT.to_string());
             };
-            unimplemented!();
+            postgres_backend::create_account(
+                &client,
+                username,
+                password_hashed,
+                account_level,
+                email,
+            )
+            .await
         }
-    }
+    }?;
+    let account = find_account_by_username(db, username).await.unwrap();
+    info!("New account: {}", username);
+    Ok(account.id)
 }
 
 pub(crate) async fn update_password_for_account(
@@ -136,13 +161,15 @@ pub(crate) async fn update_password_for_account(
             sqlite_backend::update_password_for_account(conn, username, password_hashed)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return Err(DB_ERROR_TEXT.to_string());
             };
-            unimplemented!();
+            postgres_backend::update_password_for_account(&client, username, password_hashed).await
         }
-    }
+    }?;
+    info!("Updated password for account: {}", username);
+    Ok(())
 }
 
 pub(crate) async fn update_email_for_account(
@@ -155,43 +182,26 @@ pub(crate) async fn update_email_for_account(
             sqlite_backend::update_email_for_account(conn, username, email)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return Err(DB_ERROR_TEXT.to_string());
             };
-            unimplemented!();
+            postgres_backend::update_email_for_account(&client, username, email).await
         }
-    }
-}
-
-pub(crate) async fn check_credentials(
-    db: &DatabaseConnection,
-    username: &str,
-    password: &str,
-) -> Result<i64, String> {
-    match db {
-        DatabaseConnection::Sqlite(conn) => {
-            sqlite_backend::check_credentials(conn, username, password)
-        }
-        DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
-                warn!("Lost connection to Postgres");
-                return Err(DB_ERROR_TEXT.to_string());
-            };
-            unimplemented!();
-        }
-    }
+    }?;
+    info!("Updated email for account: {}", username);
+    Ok(())
 }
 
 pub(crate) async fn get_outstanding_namereqs(db: &DatabaseConnection) -> Vec<(i64, String)> {
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::get_outstanding_namereqs(conn),
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return vec![];
             };
-            unimplemented!();
+            postgres_backend::get_outstanding_namereqs(&client).await
         }
     }
 }
@@ -205,11 +215,11 @@ pub(crate) async fn get_namecheck_for_player(
             sqlite_backend::get_namecheck_for_player(conn, player_uid)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return Err(DB_ERROR_TEXT.to_string());
             };
-            unimplemented!();
+            postgres_backend::get_namecheck_for_player(&client, player_uid).await
         }
     }
 }
@@ -224,11 +234,11 @@ pub(crate) async fn set_namecheck_for_player(
             sqlite_backend::set_namecheck_for_player(conn, player_uid, name_check_status)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return Err(DB_ERROR_TEXT.to_string());
             };
-            unimplemented!();
+            postgres_backend::set_namecheck_for_player(&client, player_uid, name_check_status).await
         }
     }
 }
@@ -242,11 +252,11 @@ pub(crate) async fn get_last_password_reset(
             sqlite_backend::get_last_password_reset(conn, account_id)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return None;
             };
-            unimplemented!();
+            postgres_backend::get_last_password_reset(&client, account_id).await
         }
     }
 }
@@ -263,11 +273,11 @@ pub(crate) async fn fetch_ranks(
             sqlite_backend::fetch_ranks(conn, epid, date, num, fill)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return vec![];
             };
-            unimplemented!();
+            postgres_backend::fetch_ranks(&client, epid, date, num, fill).await
         }
     }
 }
@@ -281,11 +291,11 @@ pub(crate) async fn fetch_my_ranks(
     match db {
         DatabaseConnection::Sqlite(conn) => sqlite_backend::fetch_my_ranks(conn, pcuid, epid, date),
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return vec![];
             };
-            unimplemented!();
+            postgres_backend::fetch_my_ranks(&client, pcuid, epid, date).await
         }
     }
 }
@@ -301,11 +311,11 @@ pub(crate) async fn set_cookie(
             sqlite_backend::set_cookie(conn, account_id, cookie, valid_secs)
         }
         DatabaseConnection::Postgres(pool) => {
-            let Ok(_client) = pool.get().await else {
+            let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
                 return Err(DB_ERROR_TEXT.to_string());
             };
-            unimplemented!();
+            postgres_backend::set_cookie(&client, account_id, cookie, valid_secs).await
         }
     }
 }

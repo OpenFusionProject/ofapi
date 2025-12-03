@@ -123,7 +123,7 @@ pub(crate) fn create_account(
     password_hashed: &str,
     account_level: u8,
     email: Option<&str>,
-) -> Result<i64, String> {
+) -> Result<(), String> {
     const QUERY: &str = "
         INSERT INTO Accounts (Login, Password, AccountLevel, Email)
         VALUES (?, ?, ?, ?);
@@ -138,10 +138,7 @@ pub(crate) fn create_account(
     if let Err(e) = stmt.next() {
         return Err(format!("Failed to create account: {}", e));
     }
-
-    let account = find_account_by_username(db, username).unwrap();
-    info!("New account: {}", username);
-    Ok(account.id)
+    Ok(())
 }
 
 pub(crate) fn update_password_for_account(
@@ -164,8 +161,6 @@ pub(crate) fn update_password_for_account(
     if let Err(e) = stmt.next() {
         return Err(format!("Failed to update password: {}", e));
     }
-
-    info!("Updated password for account: {}", username);
     Ok(())
 }
 
@@ -186,22 +181,7 @@ pub(crate) fn update_email_for_account(
     if let Err(e) = stmt.next() {
         return Err(format!("Failed to update email: {}", e));
     }
-
-    info!("Updated email for account: {}", username);
     Ok(())
-}
-
-pub(crate) fn check_credentials(
-    db: &Connection,
-    username: &str,
-    password: &str,
-) -> Result<i64, String> {
-    let account = find_account_by_username(db, username).ok_or("Account not found")?;
-    match bcrypt::verify(password, &account.password_hashed) {
-        Ok(true) => Ok(account.id),
-        Ok(false) => Err("Invalid password".to_string()),
-        Err(e) => Err(format!("bcrypt error: {}", e)),
-    }
 }
 
 pub(crate) fn get_outstanding_namereqs(db: &Connection) -> Vec<(i64, String)> {

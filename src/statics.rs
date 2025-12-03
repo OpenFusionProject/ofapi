@@ -11,7 +11,16 @@ pub(crate) fn register(mut routes: Router<Arc<AppState>>) -> Router<Arc<AppState
 
     info!("Registering static routes");
 
-    let mappings = std::fs::read_to_string(MAPPINGS_PATH).expect("Failed to open mappings file");
+    let mappings = match std::fs::read_to_string(MAPPINGS_PATH) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(
+                "Could not read static route mappings from {}: {}; no static routes will be registered",
+                MAPPINGS_PATH, e
+            );
+            return routes;
+        }
+    };
     let mappings = util::parse_csv(&mappings);
     for mapping in mappings {
         let route = &mapping[0];

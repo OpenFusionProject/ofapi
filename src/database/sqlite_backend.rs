@@ -96,25 +96,24 @@ pub(crate) fn find_account_by_username(db: &Connection, username: &str) -> Optio
     }
 }
 
-pub(crate) fn find_account_by_email(db: &Connection, email: &str) -> Option<Account> {
+pub(crate) fn find_accounts_by_email(db: &Connection, email: &str) -> Vec<Account> {
     const QUERY: &str = "
         SELECT AccountID, Login, Password, Email
         FROM Accounts
-        WHERE Email = ?
-        LIMIT 1;
+        WHERE Email = ?;
         ";
     let mut stmt = db.prepare(QUERY).unwrap();
     stmt.bind((1, email)).unwrap();
-    if let Ok(sqlite::State::Row) = stmt.next() {
-        Some(Account {
+    let mut accounts = Vec::new();
+    while let Ok(sqlite::State::Row) = stmt.next() {
+        accounts.push(Account {
             id: stmt.read(0).unwrap(),
             login: stmt.read(1).unwrap(),
             password_hashed: stmt.read(2).unwrap(),
             email: stmt.read(3).unwrap(),
-        })
-    } else {
-        None
+        });
     }
+    accounts
 }
 
 pub(crate) fn create_account(

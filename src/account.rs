@@ -214,9 +214,9 @@ async fn register_account(
     }
 
     if let Some(ref email) = req.email {
-        if database::find_account_by_email(&app.db, email)
+        if !database::find_accounts_by_email(&app.db, email)
             .await
-            .is_some()
+            .is_empty()
         {
             info!("Email already in use: {}", email);
             return (StatusCode::BAD_REQUEST, "Email already in use".to_string());
@@ -366,9 +366,9 @@ async fn verify_email(
         );
     }
 
-    if database::find_account_by_email(&app.db, &verification.email)
+    if !database::find_accounts_by_email(&app.db, &verification.email)
         .await
-        .is_some()
+        .is_empty()
     {
         info!("Email already in use: {}", &verification.email);
         return (
@@ -503,9 +503,9 @@ async fn update_email(
         return (StatusCode::BAD_REQUEST, "Invalid email".to_string());
     }
 
-    if database::find_account_by_email(&app.db, &req.new_email)
+    if !database::find_accounts_by_email(&app.db, &req.new_email)
         .await
-        .is_some()
+        .is_empty()
     {
         info!("Email already in use: {}", &req.new_email);
         return (StatusCode::BAD_REQUEST, "Email already in use".to_string());

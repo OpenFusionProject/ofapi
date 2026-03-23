@@ -118,24 +118,24 @@ pub(crate) async fn find_account_by_username(db: &Client, username: &str) -> Opt
     }
 }
 
-pub(crate) async fn find_account_by_email(db: &Client, email: &str) -> Option<Account> {
+pub(crate) async fn find_accounts_by_email(db: &Client, email: &str) -> Vec<Account> {
     const QUERY: &str = "
         SELECT AccountID, Login, Password, Email
         FROM Accounts
-        WHERE Email = $1
-        LIMIT 1;
+        WHERE Email = $1;
         ";
     let stmt = db.prepare_cached(QUERY).await.unwrap();
-    if let Ok(row) = db.query_one(&stmt, &[&email]).await {
-        Some(Account {
+    let mut accounts = Vec::new();
+    let rows = db.query(&stmt, &[&email]).await.unwrap();
+    for row in rows {
+        accounts.push(Account {
             id: row.get(0),
             login: row.get(1),
             password_hashed: row.get(2),
             email: row.get(3),
-        })
-    } else {
-        None
+        });
     }
+    accounts
 }
 
 pub(crate) async fn create_account(

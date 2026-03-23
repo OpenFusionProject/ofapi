@@ -9,7 +9,10 @@ use lettre::{
 use log::*;
 use serde::Deserialize;
 
-use crate::{database, util, AppState};
+use crate::{
+    database::{self, Account},
+    util, AppState,
+};
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct EmailConfig {
@@ -201,14 +204,34 @@ pub(crate) async fn send_temp_password_email(
     email: &str,
     valid_for: u64,
 ) -> Result<bool, String> {
-    // Find the account with the given email
-    let account = {
-        match database::find_account_by_email(&app.db, email).await {
-            Some(acc) => acc,
-            None => return Ok(false),
+    let accounts = database::find_accounts_by_email(&app.db, email).await;
+    if accounts.is_empty() {
+        info!("No account found for email: {}", util::mask_email(email));
+        return Ok(false);
+    }
+
+    // You are technically not supposed to have the same email assigned to multiple accounts,
+    // but previous versions of OFAPI allowed it. To avoid bricking the accounts that
+    // are not the first one found, we send the temporary password to all of them that match.
+    let mut sent = false;
+    for account in accounts {
+        if _send_temp_password_email(app, email, valid_for, &account)
+            .await
+            .is_ok_and(|r| r)
+        {
+            sent = true;
         }
-    };
-    let username = account.login;
+    }
+    Ok(sent)
+}
+
+async fn _send_temp_password_email(
+    app: &AppState,
+    email: &str,
+    valid_for: u64,
+    account: &Account,
+) -> Result<bool, String> {
+    let username = account.login.clone();
 
     // Generate the temporary password and store it in state
     let temp_password = util::gen_random_string(16, &app.rng);

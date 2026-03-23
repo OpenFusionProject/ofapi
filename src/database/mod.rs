@@ -107,15 +107,15 @@ pub(crate) async fn find_account_by_username(
     }
 }
 
-pub(crate) async fn find_account_by_email(db: &DatabaseConnection, email: &str) -> Option<Account> {
+pub(crate) async fn find_accounts_by_email(db: &DatabaseConnection, email: &str) -> Vec<Account> {
     match db {
-        DatabaseConnection::Sqlite(conn) => sqlite_backend::find_account_by_email(conn, email),
+        DatabaseConnection::Sqlite(conn) => sqlite_backend::find_accounts_by_email(conn, email),
         DatabaseConnection::Postgres(pool) => {
             let Ok(client) = pool.get().await else {
                 warn!("Lost connection to Postgres");
-                return None;
+                return vec![];
             };
-            postgres_backend::find_account_by_email(&client, email).await
+            postgres_backend::find_accounts_by_email(&client, email).await
         }
     }
 }

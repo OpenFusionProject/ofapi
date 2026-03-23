@@ -366,6 +366,17 @@ async fn verify_email(
         );
     }
 
+    if database::find_account_by_email(&app.db, &verification.email)
+        .await
+        .is_some()
+    {
+        info!("Email already in use: {}", &verification.email);
+        return (
+            StatusCode::BAD_REQUEST,
+            util::get_error_page("Error Verifying Email", "Email already in use"),
+        );
+    }
+
     let username = match verification.kind {
         EmailVerificationKind::Register {
             ref username,
@@ -490,6 +501,14 @@ async fn update_email(
 
     if !EMAIL_REGEX.is_match(&req.new_email) {
         return (StatusCode::BAD_REQUEST, "Invalid email".to_string());
+    }
+
+    if database::find_account_by_email(&app.db, &req.new_email)
+        .await
+        .is_some()
+    {
+        info!("Email already in use: {}", &req.new_email);
+        return (StatusCode::BAD_REQUEST, "Email already in use".to_string());
     }
 
     let account_id =

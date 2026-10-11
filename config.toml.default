@@ -35,7 +35,6 @@ custom_loading_screen = false
 
 [launcher]
 route = "/ofl"
-add_subroute = "/add"
 
 [monitor]
 route = "/status"

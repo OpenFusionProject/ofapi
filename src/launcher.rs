@@ -1,20 +1,17 @@
-use std::sync::Arc;
-
 use axum::{
     extract::State,
     response::IntoResponse,
     routing::{get, Router},
 };
 use log::info;
-use ofapi::util;
 use serde::Deserialize;
+use std::sync::Arc;
 
-use crate::AppState;
+use crate::{util, AppState};
 
 #[derive(Deserialize, Clone)]
 pub(crate) struct LauncherConfig {
     route: String,
-    add_subroute: String,
 }
 
 pub(crate) fn register(
@@ -22,10 +19,16 @@ pub(crate) fn register(
     config: &LauncherConfig,
 ) -> Router<Arc<AppState>> {
     let route = &config.route;
-    info!("Registering launcher routes @ {}", route);
-    let add_route = util::get_subroute(route, &config.add_subroute);
-    info!("\tAdd route @ {}", add_route);
-    routes.route(&add_route, get(redirect_server))
+    info!("Registering launcher route @ {}", route);
+    let routes = routes.route(route, get(redirect_server));
+
+    // Some browsers automatically add a trailing slash, so register that as well
+    if let Some(alternate_route) = util::get_trailing_slash_route(route) {
+        info!("Registering launcher alt route @ {}", alternate_route);
+        routes.route(&alternate_route, get(redirect_server))
+    } else {
+        routes
+    }
 }
 
 async fn redirect_server(State(state): State<Arc<AppState>>) -> impl IntoResponse {

@@ -59,8 +59,7 @@ cargo build --release
 | legacy     | /index.html              | GET    | No     | Get an index.html file for legacy client use |
 |            | /assetInfo.php           | GET    | No     | Get an assetInfo.php file for legacy client use |
 |            | /loginInfo.php           | GET    | No     | Get a loginInfo.php file for legacy client use |
-| launcher   | /ofl                     |        |        |
-|            | /ofl/add                 | GET    | No     | Launch OpenFusionLauncher and prefill the "Add Server" modal
+| launcher   | /ofl                     | GET    | No     | Launch OpenFusionLauncher with this server
 | static     | /*                       | GET    | No     | See `statics.csv`
 
 \*Auth by refresh token instead of session token

@@ -19,6 +19,16 @@ pub fn get_subroute(route: &str, subroute: &str) -> String {
     format!("{}/{}", route_noslash, subroute_noslash)
 }
 
+pub fn get_trailing_slash_route(route: &str) -> Option<String> {
+    if route == "/" {
+        None
+    } else if route.ends_with('/') {
+        Some(route.trim_end_matches('/').to_string())
+    } else {
+        Some(format!("{}/", route))
+    }
+}
+
 pub fn wrap_xml(name: &str, content: &str, newlines: bool) -> String {
     if newlines {
         format!("<{}>\n{}</{}>\n", name, content, name)

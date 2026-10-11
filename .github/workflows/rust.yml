@@ -1,0 +1,48 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build slim
+      run: cargo build --no-default-features --verbose
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Build release (w/ TLS)
+      run: cargo build --release --verbose
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: ofapi-linux
+        path: target/release/ofapi
+        if-no-files-found: error
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build slim
+      run: cargo build --no-default-features --verbose
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Build release (w/ TLS)
+      run: cargo build --release --verbose
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: ofapi-windows
+        path: |
+          target/release/ofapi.exe
+          target/release/ofapi.pdb
+        if-no-files-found: error
+      

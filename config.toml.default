@@ -33,6 +33,10 @@ login_address = "play.myserver.xyz:23000"
 # If you have your own loading bar assets you wanna use (in static/launcher/loading), set true
 custom_loading_screen = false
 
+[launcher]
+route = "/ofl"
+add_subroute = "/add"
+
 [monitor]
 route = "/status"
 monitor_ip = "127.0.0.1:8003"

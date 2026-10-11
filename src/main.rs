@@ -18,6 +18,7 @@ pub use ofapi::util;
 mod account;
 mod auth;
 mod cookie;
+mod launcher;
 mod legacy;
 mod moderation;
 mod monitor;
@@ -70,6 +71,7 @@ struct Config {
     auth: Option<auth::AuthConfig>,
     cookie: Option<cookie::CookieConfig>,
     legacy: Option<legacy::LegacyConfig>,
+    launcher: Option<launcher::LauncherConfig>,
 }
 impl Config {
     fn load() -> Self {
@@ -147,6 +149,9 @@ async fn main() {
             config.game.versions.first(),
             &config.core.template_dir,
         )
+    }
+    if let Some(ref launcher_config) = config.launcher {
+        routes = launcher::register(routes, launcher_config);
     }
 
     // add CORS headers for non-sensitive APIs

@@ -34,6 +34,7 @@ cargo build --release
 | auth       | No*      | Yes    | Authentication and authorization APIs |
 | cookie     | No*      | Yes    | Secure game login |
 | legacy     | No       | No     | Compatibility with legacy, file-based clients |
+| launcher   | No       | No     | Protocol activation redirects for OpenFusionLauncher |
 | static     | N/A      | No     | Static resource serving |
 
 \*Module highly recommended
@@ -58,6 +59,8 @@ cargo build --release
 | legacy     | /index.html              | GET    | No     | Get an index.html file for legacy client use |
 |            | /assetInfo.php           | GET    | No     | Get an assetInfo.php file for legacy client use |
 |            | /loginInfo.php           | GET    | No     | Get a loginInfo.php file for legacy client use |
+| launcher   | /ofl                     |        |        |
+|            | /ofl/add                 | GET    | No     | Launch OpenFusionLauncher and prefill the "Add Server" modal
 | static     | /*                       | GET    | No     | See `statics.csv`
 
 \*Auth by refresh token instead of session token

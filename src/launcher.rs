@@ -43,10 +43,7 @@ async fn trampoline(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let app = &state;
     let public_url = &app.config.core.public_url;
     let mut vars = HashMap::new();
-    vars.insert(
-        "LAUNCH_URI".to_string(),
-        new_uri,
-    );
+    vars.insert("LAUNCH_URI".to_string(), new_uri);
     vars.insert(
         "SERVER_NAME".to_string(),
         app.config.core.server_name.clone(),

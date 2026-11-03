@@ -3,7 +3,7 @@ use std::sync::{Arc, OnceLock};
 use axum::{http::StatusCode, routing::get, Json, Router};
 use ffmonitor::{Monitor, MonitorNotification};
 use log::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::AppState;
 
@@ -13,10 +13,8 @@ pub(crate) struct MonitorConfig {
     monitor_ip: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-struct Status {
-    player_count: usize,
-}
+mod api;
+pub use api::*;
 
 static MONITOR: OnceLock<tokio::sync::Mutex<Monitor>> = OnceLock::new();
 static STATUS: OnceLock<std::sync::Mutex<Status>> = OnceLock::new();

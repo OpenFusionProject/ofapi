@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::{tokens::TokenCapability, util};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -7,8 +8,7 @@ use axum::{
     Json, Router,
 };
 use log::*;
-use ofapi::{tokens::TokenCapability, util};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{auth, database, AppState};
 
@@ -29,11 +29,8 @@ pub(crate) fn register(
         .route(namereq_route, post(name_request))
 }
 
-#[derive(Debug, Serialize)]
-struct NameRequest {
-    player_uid: u64,
-    requested_name: String,
-}
+mod api;
+pub use api::*;
 
 #[derive(Debug)]
 pub(crate) enum NameCheckStatus {
@@ -50,14 +47,6 @@ impl NameCheckStatus {
             _ => None,
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct NameRequestDecision {
-    player_uid: u64,
-    requested_name: String,
-    decision: String,
-    by: String,
 }
 
 async fn get_outstanding_requests(

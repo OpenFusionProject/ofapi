@@ -16,9 +16,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --features full --verbose
     - name: Build release (no TLS)
-      run: cargo build --release --no-default-features --verbose
+      run: cargo build --release --features full --verbose
     - name: Upload artifact (no TLS)
       uses: actions/upload-artifact@v4.4.3
       with:
@@ -26,7 +26,7 @@ jobs:
         path: target/release/ofapi
         if-no-files-found: error
     - name: Build release (w/ TLS)
-      run: cargo build --release --verbose
+      run: cargo build --release --features tls --verbose
     - name: Upload artifact
       uses: actions/upload-artifact@v4.4.3
       with:
@@ -38,9 +38,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --features full --verbose
     - name: Build release (no TLS)
-      run: cargo build --release --no-default-features --verbose
+      run: cargo build --release --features full --verbose
     - name: Upload artifact (no TLS)
       uses: actions/upload-artifact@v4.4.3
       with:
@@ -48,7 +48,7 @@ jobs:
         path: target/release/ofapi.exe
         if-no-files-found: error
     - name: Build release (w/ TLS)
-      run: cargo build --release --verbose
+      run: cargo build --release --features tls --verbose
     - name: Upload artifact
       uses: actions/upload-artifact@v4.4.3
       with:

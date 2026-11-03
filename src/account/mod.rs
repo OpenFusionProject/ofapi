@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
+use crate::tokens::TokenCapability;
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
@@ -11,9 +12,8 @@ use axum::{
     Json, Router,
 };
 use log::*;
-use ofapi::tokens::TokenCapability;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{
     auth, database,
@@ -78,38 +78,8 @@ impl AccountConfig {
     }
 }
 
-#[derive(Serialize, Debug)]
-struct AccountInfoResponse {
-    username: String,
-    email: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct RegisterRequest {
-    username: String,
-    password: String,
-    email: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct EmailVerificationRequest {
-    code: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct UpdatePasswordRequest {
-    new_password: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct UpdateEmailRequest {
-    new_email: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct TemporaryPasswordRequest {
-    email: String,
-}
+mod api;
+pub use api::*;
 
 pub(crate) fn register(
     routes: Router<Arc<AppState>>,

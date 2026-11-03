@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::tokens::TokenCapability;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -8,9 +9,8 @@ use axum::{
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
 use log::*;
-use ofapi::tokens::TokenCapability;
 use ring::rand::{SecureRandom, SystemRandom};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{auth, database, util, AppState};
 
@@ -20,12 +20,8 @@ pub(crate) struct CookieConfig {
     valid_secs: u64,
 }
 
-#[derive(Serialize)]
-pub(crate) struct CookieResponse {
-    username: String,
-    cookie: String,
-    expires: u64,
-}
+mod api;
+pub use api::*;
 
 pub(crate) fn register(
     routes: Router<Arc<AppState>>,

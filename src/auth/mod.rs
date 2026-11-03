@@ -1,5 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
+use crate::tokens::{self, TokenCapabilities, TokenCapability, TokenLifetime};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -7,9 +8,8 @@ use axum::{
     Json, Router,
 };
 use log::{info, warn};
-use ofapi::tokens::{self, TokenCapabilities, TokenCapability, TokenLifetime};
 use ring::rand::{SecureRandom, SystemRandom};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{database, util, AppState};
 
@@ -22,11 +22,8 @@ pub(crate) struct AuthConfig {
     valid_secs_session: u64,
 }
 
-#[derive(Deserialize)]
-pub(crate) struct AuthRequest {
-    username: String,
-    password: String,
-}
+mod api;
+pub use api::*;
 
 pub(crate) static SECRET_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 
@@ -114,12 +111,6 @@ async fn do_auth(
             ))
         }
     }
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct RefreshResponse {
-    username: String,
-    session_token: String,
 }
 
 async fn do_refresh(

@@ -13,7 +13,7 @@ const DB_ERROR_TEXT: &str = "Database error";
 pub(crate) struct Account {
     pub(crate) id: i64,
     pub(crate) login: String,
-    pub(crate) password_hashed: String,
+    password_hashed: String,
     pub(crate) email: String,
 }
 

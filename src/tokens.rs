@@ -58,7 +58,7 @@ impl Default for TokenCapabilities {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct Claims {
+struct Claims {
     sub: String, // account id as a string
     crt: u64,    // creation timestamp in UTC
     exp: u64,    // expiration timestamp in UTC

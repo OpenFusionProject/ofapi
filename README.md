@@ -9,15 +9,21 @@ Some modules are "secure", meaning their APIs must be accessed by the TLS port b
 ofapi requires an OpenFusion sqlite database of version 6 or higher.
 
 ## Developing
-Edit `config.toml` to your liking and then
+The server is gated behind the `full` feature (enabled automatically by `tls`). Edit `config.toml` to your liking and then
 ```
-cargo run
+cargo run --features full
 ```
 
 ## Production
 ```
-cargo build --release
+cargo build --release --features full
 ./target/release/ofapi
+```
+
+## Using as a library
+With default features, this crate only exposes the request/response types used by the web APIs (e.g. `ofapi::InfoResponse`, `ofapi::cookie::CookieResponse`), depending only on `serde`:
+```toml
+ofapi = { git = "https://github.com/OpenFusionProject/ofapi" }
 ```
 
 ## Modules & APIs
@@ -87,6 +93,6 @@ Service tokens are special tokens that are manually created using the `gen_token
 #### Generation
 You can run `gen_token` with Cargo like so:
 ```
-cargo run --bin=gen_token
+cargo run --features full --bin=gen_token
 ```
 An interactive prompt will guide you through the token creation process.

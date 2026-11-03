@@ -6,28 +6,57 @@ license = "MIT"
 default-run = "ofapi"
 
 [dependencies]
-axum = { version = "0.7.5", features = ["multipart", "query"] }
+axum = { version = "0.7.5", features = ["multipart", "query"], optional = true }
 axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"], optional = true }
-base64 = "0.22.1"
-bcrypt = "0.15.1"
-deadpool-postgres = "0.14.1"
-dns-lookup = "2.0.4"
-ffmonitor = { git = "https://github.com/OpenFusionProject/ffmonitor", tag = "v1.2.1" }
-jsonwebtoken = "9.3.0"
-lettre = "0.11.11"
-log = "0.4.22"
-regex = "1.11.1"
-ring = "0.17.8"
+base64 = { version = "0.22.1", optional = true }
+bcrypt = { version = "0.15.1", optional = true }
+deadpool-postgres = { version = "0.14.1", optional = true }
+dns-lookup = { version = "2.0.4", optional = true }
+ffmonitor = { git = "https://github.com/OpenFusionProject/ffmonitor", tag = "v1.2.1", optional = true }
+jsonwebtoken = { version = "9.3.0", optional = true }
+lettre = { version = "0.11.11", optional = true }
+log = { version = "0.4.22", optional = true }
+regex = { version = "1.11.1", optional = true }
+ring = { version = "0.17.8", optional = true }
 rustls = { version = "0.23.12", features = ["ring"], default-features = false, optional = true }
 serde = { version = "1.0.209", features = ["derive"] }
-serde_json = "1.0.135"
-serde_repr = "0.1.19"
-simplelog = "0.12.2"
-sqlite = "0.36.1"
-tokio = { version = "1.40.0", features = ["full"] }
-tokio-postgres = "0.7.15"
-toml = "0.8.19"
-tower-http = { version = "0.5.2", features = ["fs", "cors"] }
+serde_json = { version = "1.0.135", optional = true }
+serde_repr = { version = "0.1.19", optional = true }
+simplelog = { version = "0.12.2", optional = true }
+sqlite = { version = "0.36.1", optional = true }
+tokio = { version = "1.40.0", features = ["full"], optional = true }
+tokio-postgres = { version = "0.7.15", optional = true }
+toml = { version = "0.8.19", optional = true }
+tower-http = { version = "0.5.2", features = ["fs", "cors"], optional = true }
 
 [features]
-tls = ["dep:axum-server", "dep:rustls"]
+full = [
+    "dep:axum",
+    "dep:base64",
+    "dep:bcrypt",
+    "dep:deadpool-postgres",
+    "dep:dns-lookup",
+    "dep:ffmonitor",
+    "dep:jsonwebtoken",
+    "dep:lettre",
+    "dep:log",
+    "dep:regex",
+    "dep:ring",
+    "dep:serde_json",
+    "dep:serde_repr",
+    "dep:simplelog",
+    "dep:sqlite",
+    "dep:tokio",
+    "dep:tokio-postgres",
+    "dep:toml",
+    "dep:tower-http",
+]
+tls = ["full", "dep:axum-server", "dep:rustls"]
+
+[[bin]]
+name = "ofapi"
+required-features = ["full"]
+
+[[bin]]
+name = "gen_token"
+required-features = ["full"]

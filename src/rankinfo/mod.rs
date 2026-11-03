@@ -45,15 +45,8 @@ impl Rank {
     }
 }
 
-#[derive(Deserialize, Debug)]
-struct RankInfoRequest {
-    #[serde(rename = "PCUID")]
-    pcuid: i64,
-    #[serde(rename = "EP_ID")]
-    epid: i64,
-    #[serde(rename = "NUM")]
-    num: Option<usize>,
-}
+mod api;
+pub use api::*;
 
 fn ranks_to_xml_scores(mut ranks: Vec<Rank>) -> Vec<String> {
     ranks.sort_by(|a, b| {

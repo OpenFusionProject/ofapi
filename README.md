@@ -72,6 +72,8 @@ ofapi = { git = "https://github.com/OpenFusionProject/ofapi" }
 
 Technical documentation on each API is WIP and will be on the GitHub wiki.
 
+**The HTTP API is backwards-compatible across all versions; use version comparisons only to detect newly added features.** Major version bumps are for breaking changes in the Rust crate, not the wire protocol.
+
 ## Static Resources
 Static files and directories can be easily served by mapping them to an endpoint in the `statics.csv` file.
 These are accessible from both HTTP and HTTPS. Some common mappings are included as defaults.

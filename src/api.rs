@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InfoResponse {
     pub server_name: String,

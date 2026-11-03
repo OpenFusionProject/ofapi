@@ -19,19 +19,25 @@ jobs:
       run: cargo test --features full --verbose
     - name: Build release (no TLS)
       run: cargo build --release --features full --verbose
+    - name: Build token tool
+      run: cargo build --release --features full --bin gen_token --verbose
     - name: Upload artifact (no TLS)
       uses: actions/upload-artifact@v4.4.3
       with:
         name: ofapi-linux-no-tls
-        path: target/release/ofapi
+        path: |
+          target/release/ofapi
+          target/release/gen_token
         if-no-files-found: error
     - name: Build release (w/ TLS)
       run: cargo build --release --features tls --verbose
-    - name: Upload artifact
+    - name: Upload artifact (w/ TLS)
       uses: actions/upload-artifact@v4.4.3
       with:
         name: ofapi-linux
-        path: target/release/ofapi
+        path: |
+          target/release/ofapi
+          target/release/gen_token
         if-no-files-found: error
   build-windows:
     runs-on: windows-latest
@@ -41,20 +47,28 @@ jobs:
       run: cargo test --features full --verbose
     - name: Build release (no TLS)
       run: cargo build --release --features full --verbose
+    - name: Build token tool
+      run: cargo build --release --features full --bin gen_token --verbose
     - name: Upload artifact (no TLS)
       uses: actions/upload-artifact@v4.4.3
       with:
         name: ofapi-windows-no-tls
-        path: target/release/ofapi.exe
+        path: |
+          target/release/ofapi.exe
+          target/release/ofapi.pdb
+          target/release/gen_token.exe
+          target/release/gen_token.pdb
         if-no-files-found: error
     - name: Build release (w/ TLS)
       run: cargo build --release --features tls --verbose
-    - name: Upload artifact
+    - name: Upload artifact (w/ TLS)
       uses: actions/upload-artifact@v4.4.3
       with:
         name: ofapi-windows
         path: |
           target/release/ofapi.exe
           target/release/ofapi.pdb
+          target/release/gen_token.exe
+          target/release/gen_token.pdb
         if-no-files-found: error
       

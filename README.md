@@ -50,7 +50,8 @@ ofapi = { git = "https://github.com/OpenFusionProject/ofapi" }
 | Module     | Endpoints                | Method | Authed | Description |
 |------------|--------------------------|--------|--------|-------------|
 | core       | /                        | GET    | No     | Basic info about ofapi and OpenFusion configuration |
-| monitor    | /status                  | GET    | No     | Real-time game data (e.g. player count) |
+| monitor    | /status                  | GET    | No     | Real-time global game data (e.g. player count) |
+| feed       | /feed                    | GET    | Yes    | Real-time game data feed for an account via WebSocket |
 | moderation | /namereq                 | GET    | Yes    | Get a list of pending player name requests |
 |            |                          | POST   | Yes    | Approve or deny a player name request |
 | rankinfo   | /getranks                | POST   | No     | Rank info for an Infected Zone (game format) |

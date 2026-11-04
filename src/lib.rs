@@ -42,6 +42,14 @@ pub mod monitor {
 }
 
 #[cfg(feature = "full")]
+pub mod feed;
+#[cfg(not(feature = "full"))]
+pub mod feed {
+    mod api;
+    pub use api::*;
+}
+
+#[cfg(feature = "full")]
 pub mod rankinfo;
 #[cfg(not(feature = "full"))]
 pub mod rankinfo {

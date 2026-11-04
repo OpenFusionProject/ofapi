@@ -40,6 +40,9 @@ route = "/ofl"
 route = "/status"
 monitor_ip = "127.0.0.1:8003"
 
+[feed]
+route = "/feed"
+
 [moderation]
 namereq_route = "/namereq"
 

@@ -120,6 +120,24 @@ pub(crate) async fn find_accounts_by_email(db: &DatabaseConnection, email: &str)
     }
 }
 
+pub(crate) async fn find_account_id_by_player_name(
+    db: &DatabaseConnection,
+    player_name: &str,
+) -> Option<i64> {
+    match db {
+        DatabaseConnection::Sqlite(conn) => {
+            sqlite_backend::find_account_id_by_player_name(conn, player_name)
+        }
+        DatabaseConnection::Postgres(pool) => {
+            let Ok(client) = pool.get().await else {
+                warn!("Lost connection to Postgres");
+                return None;
+            };
+            postgres_backend::find_account_id_by_player_name(&client, player_name).await
+        }
+    }
+}
+
 pub(crate) async fn create_account(
     db: &DatabaseConnection,
     username: &str,

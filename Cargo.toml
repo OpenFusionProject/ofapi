@@ -6,7 +6,7 @@ license = "MIT"
 default-run = "ofapi"
 
 [dependencies]
-axum = { version = "0.7.5", features = ["multipart", "query"], optional = true }
+axum = { version = "0.8", features = ["multipart", "query", "ws"], optional = true }
 axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"], optional = true }
 base64 = { version = "0.22.1", optional = true }
 bcrypt = { version = "0.15.1", optional = true }

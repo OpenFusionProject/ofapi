@@ -138,6 +138,21 @@ pub(crate) async fn find_accounts_by_email(db: &Client, email: &str) -> Vec<Acco
     accounts
 }
 
+pub(crate) async fn find_account_id_by_player_name(db: &Client, player_name: &str) -> Option<i64> {
+    const QUERY: &str = "
+        SELECT AccountID
+        FROM Players
+        WHERE FirstName || ' ' || LastName = $1
+        LIMIT 1;
+        ";
+    let stmt = db.prepare_cached(QUERY).await.unwrap();
+    if let Ok(row) = db.query_one(&stmt, &[&player_name]).await {
+        Some(row.get(0))
+    } else {
+        None
+    }
+}
+
 pub(crate) async fn create_account(
     db: &Client,
     username: &str,

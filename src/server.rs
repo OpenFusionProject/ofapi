@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
-    account, auth, cookie, database, database::DatabaseConnection, email, launcher, legacy,
+    account, auth, cookie, database, database::DatabaseConnection, email, feed, launcher, legacy,
     moderation, monitor, rankinfo, statics, InfoResponse,
 };
 
@@ -53,6 +53,7 @@ pub(crate) struct Config {
     pub(crate) email: Option<email::EmailConfig>,
     pub(crate) game: GameConfig,
     monitor: Option<monitor::MonitorConfig>,
+    feed: Option<feed::FeedConfig>,
     moderation: Option<moderation::ModerationConfig>,
     pub(crate) rankinfo: Option<rankinfo::RankInfoConfig>,
     pub(crate) account: Option<account::AccountConfig>,
@@ -127,7 +128,7 @@ pub async fn run() {
         routes = rankinfo::register(routes, rankinfo_config);
     }
     if let Some(ref monitor_config) = config.monitor {
-        routes = monitor::register(routes, monitor_config);
+        routes = monitor::register(routes, monitor_config, state.db.clone());
     }
     if let Some(ref legacy_config) = config.legacy {
         routes = legacy::register(
@@ -158,6 +159,9 @@ pub async fn run() {
     }
     if let Some(ref moderation_config) = config.moderation {
         routes_tls = moderation::register(routes_tls, moderation_config);
+    }
+    if let Some(ref feed_config) = config.feed {
+        routes_tls = feed::register(routes_tls, feed_config);
     }
 
     // init both protocols

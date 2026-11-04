@@ -116,6 +116,22 @@ pub(crate) fn find_accounts_by_email(db: &Connection, email: &str) -> Vec<Accoun
     accounts
 }
 
+pub(crate) fn find_account_id_by_player_name(db: &Connection, player_name: &str) -> Option<i64> {
+    const QUERY: &str = "
+        SELECT AccountID
+        FROM Players
+        WHERE FirstName || ' ' || LastName = ?
+        LIMIT 1;
+        ";
+    let mut stmt = db.prepare(QUERY).unwrap();
+    stmt.bind((1, player_name)).unwrap();
+    if let Ok(sqlite::State::Row) = stmt.next() {
+        Some(stmt.read(0).unwrap())
+    } else {
+        None
+    }
+}
+
 pub(crate) fn create_account(
     db: &Connection,
     username: &str,

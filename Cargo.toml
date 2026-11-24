@@ -14,7 +14,7 @@ deadpool-postgres = { version = "0.14.1", optional = true }
 dns-lookup = { version = "2.0.4", optional = true }
 ffmonitor = { git = "https://github.com/OpenFusionProject/ffmonitor", tag = "v1.2.1", optional = true }
 jsonwebtoken = { version = "9.3.0", optional = true }
-lettre = { version = "0.11.11", optional = true }
+lettre = { version = "0.11.11", default-features = false, features = ["smtp-transport", "pool", "hostname", "builder", "rustls-tls", "rustls-native-certs"], optional = true }
 log = { version = "0.4.22", optional = true }
 regex = { version = "1.11.1", optional = true }
 ring = { version = "0.17.8", optional = true }
